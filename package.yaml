@@ -1,0 +1,31 @@
+name:               ------
+version:            0.1.0.0
+license:            NONE
+author:             Vito Canadi
+maintainer:         vito.canadi@gmail.com
+extra-source-files: CHANGELOG.md
+synopsis:           ---
+
+default-extensions:
+  - LambdaCase
+  - OverloadedStrings
+  - DefaultSignatures
+  - ScopedTypeVariables
+  - TypeApplications
+  - DeriveGeneric
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+
+tests:
+  spec:
+    build-depends:
+    - base
+    - hspec
+    - ---------
+    main: Spec.hs
+    source-dirs: spec
+version: 0.1.0.0
