@@ -1,4 +1,4 @@
-name:               ------
+name:               godot-lang
 version:            0.1.0.0
 license:            NONE
 author:             Vito Canadi
@@ -16,6 +16,9 @@ default-extensions:
 
 dependencies:
   - base
+  - linear
+  - lens
+  - text
 
 library:
   source-dirs: src
@@ -25,7 +28,7 @@ tests:
     build-depends:
     - base
     - hspec
-    - ---------
+    - godot-lang
     main: Spec.hs
     source-dirs: spec
 version: 0.1.0.0
