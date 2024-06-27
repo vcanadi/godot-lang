@@ -19,6 +19,8 @@ dependencies:
   - linear
   - lens
   - text
+  - interpolate
+  - containers
 
 library:
   source-dirs: src

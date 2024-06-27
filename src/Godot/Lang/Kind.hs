@@ -6,6 +6,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 
 module Godot.Lang.Kind where
@@ -20,13 +24,23 @@ import Godot.Lang.Kind.General
 import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
 import Control.Lens.TH(makeLenses)
 import Control.Lens
-import Data.Map.Strict (Map, insertWith, fromList, unionWith)
+import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
+import Control.Arrow ((>>>))
+import Data.String.Interpolate (i)
+import Data.List (intercalate)
 
 -- | Godot language/script AST
 -- Here are defined types which are lifted into kinds and whose values (as types) build godot's AST during compilation
 
 -- | Name of the module
-type ClassName = String
+newtype ClassName = ClassName String deriving (Eq, Show, Semigroup, Monoid)
+
+-- | enum values
+newtype EnumVal = EnumVal { evVal :: String } deriving (Eq, Show, Semigroup, Monoid)
+
+-- | Generate enum val from type level string (symbol)
+enumVal :: forall con. (KnownSymbol con) => EnumVal
+enumVal = EnumVal $ symbolVal (Proxy @con)
 
 -- | Inheritacne 'extends' expression
 data Extends = ExtendsObject
@@ -42,6 +56,9 @@ data Prim t where
   PrimV2     :: V2 Double -> Prim (V2 Double)
   PrimV3     :: V3 Double -> Prim (V3 Double)
 
+data GType t where
+
+
 -- | Any godot type (primitives + custom classes)
 data Typ t where
   TypNat :: Prim t -> Typ (Prim t)
@@ -53,14 +70,14 @@ newtype Script = Script
   }
 
 -- | Variable declaration
-data Var = Var
+data Var  = Var
   { varName :: String
-  -- , defVarValue :: GDType
+  -- , varValue :: Maybe GDType
+  -- , varType :: GDType
   } deriving (Eq,Show)
 
 data DefClsInn = DefClsInn
-  { _dciExtends :: Extends
-  , _dciDefEnums :: Map String [String]
+  { _dciDefEnums :: Map String [EnumVal]
   , _dciDefClasses :: [DefCls]
   , _dciDefConsts :: [Var]
   , _dciDefVars :: [Var]
@@ -70,6 +87,7 @@ data DefClsInn = DefClsInn
 -- | Defintion of a godot type/class
 data DefCls = DefCls
   { _dcName :: ClassName
+  , _dcExtends :: Extends
   , _dcInn :: DefClsInn
   } deriving (Eq,Show)
 
@@ -80,29 +98,25 @@ $(makeLenses ''DefCls)
 -- Combinators for building DefCls
 
 emptyDefCls :: forall cls. (KnownSymbol cls) => DefCls
-emptyDefCls  = DefCls (symbolVal (Proxy @cls)) $ emptyDefClsInn
+emptyDefCls  = DefCls (ClassName $ symbolVal (Proxy @cls)) ExtendsObject $ emptyDefClsInn
 
 emptyDefClsInn ::  DefClsInn
-emptyDefClsInn  = DefClsInn ExtendsObject mempty [] [] []
+emptyDefClsInn  = DefClsInn mempty [] [] []
 
 
 -- | Join two DefClsInns by making a union of cons enum and union of its fields
 joinDefClsInn :: DefClsInn -> DefClsInn -> DefClsInn
-joinDefClsInn dci0 dci1 = DefClsInn ExtendsObject (unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1)) [] [] (_dciDefVars dci0 <> _dciDefVars dci1)
+joinDefClsInn dci0 dci1 = DefClsInn (unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1)) [] [] (_dciDefVars dci0 <> _dciDefVars dci1)
 
 instance Semigroup DefClsInn where (<>) = joinDefClsInn
 instance Monoid DefClsInn where mempty =  emptyDefClsInn
 
 addToEnum :: String -> String -> DefClsInn -> DefClsInn
-addToEnum k v = dciDefEnums %~ insertWith (<>) k [v]
-
--- | Add specific constructor to cons enum
-singletonCon :: forall (con :: Symbol). KnownSymbol con => DefClsInn
-singletonCon = addToEnum "cons" (symbolVal (Proxy @con)) emptyDefClsInn
+addToEnum k v = dciDefEnums %~ insertWith (flip (<>)) k [EnumVal v]
 
 -- | Add specific constructor to cons enum
 addCons :: forall (con :: Symbol). KnownSymbol con => DefClsInn -> DefClsInn
-addCons = addToEnum "cons" (symbolVal (Proxy @con))
+addCons = addToEnum "Cons" (symbolVal (Proxy @con))
 
 
 
@@ -125,6 +139,24 @@ addCons = addToEnum "cons" (symbolVal (Proxy @con))
 -- instance AsText DefVar where
 --   asText (DefVar nm val) = show nm "=" val
 
+formatDefCls :: DefCls -> String
+formatDefCls (DefCls (ClassName cls) ext (DefClsInn ens _ csts vars))  = [i|
+class_name #{cls}
+
+extends #{ext}
+
+#{unlines $ fmap formatEnum $ toList ens   }
+#{unlines $ fmap formatVars vars   }
+
+|]
+
+formatEnum :: (String, [EnumVal]) -> String
+formatEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} } |]
+
+formatVars :: Var -> String
+formatVars (Var nm ) = [i|var #{nm} |]
+
+
 data CliMsg
   = JOIN
   | LEAVE Float
@@ -135,19 +167,6 @@ data CliMsg
 data Action = MOVE Int
             | FIRE Int
   deriving (Show, Eq, Read)
-
-
-class MkDefCls a where
-  defCls :: Proxy a -> DefCls
-
-instance MkDefCls CliMsg where
-  defCls Proxy = DefCls "CliMsg" $ DefClsInn
-    ExtendsObject
-    (fromList [  ("CliMsgCon", [ "JOIN", "LEAVE", "ACTION", "GET_STATE" ]) ])
-    []
-    []
-    []
-
 
 -- genDefCls :: forall a. (MkC (Rep a)) => DefCls
 -- genDefCls = mkC (Proxy @(Rep a))
@@ -193,106 +212,20 @@ genDefCls :: forall a. (GDC (Rep a)) => DefCls
 genDefCls = gDC  (Proxy @(Rep a))
 
 
-class GDC a                                                                     where gDC :: Proxy a -> DefCls
-instance (GDCI f, KnownSymbol dat) => GDC (M1 D ('MetaData dat m fn isnt) f) where gDC _  = DefCls (symbolVal (Proxy @dat)) $ gDCI (Proxy @f)
+class GDC (f :: Type -> Type)                                                   where gDC :: Proxy f -> DefCls
+instance (GDCISum f, KnownSymbol dat) => GDC (M1 D ('MetaData dat m fn isnt) f) where gDC _  = DefCls (ClassName $ symbolVal (Proxy @dat)) ExtendsObject $ gDCISum (Proxy @f) mempty
 
-class GDCI a                                                                               where gDCI :: Proxy a -> DefClsInn
-instance (GDCI f, GDCI g)          => GDCI (f :+: g)                                       where gDCI _ = gDCI (Proxy @f) <> gDCI (Proxy @g)
-instance (KnownSymbol con, GDCI f) => GDCI (C1 ('MetaCons con fix hasRec) f)               where gDCI _ = singletonCon @con <> gDCI (Proxy @f)
-instance (GDCI f, GDCI g)          => GDCI (f :*: g)                                       where gDCI _ = gDCI (Proxy @f) <> gDCI (Proxy @g)
-instance (KnownSymbol field)       => GDCI (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCI _ = emptyDefClsInn & dciDefVars %~ (<>[Var $ symbolVal (Proxy @field) ])
-instance                              GDCI (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCI _ = emptyDefClsInn & dciDefVars %~ (<>[Var $ symbolVal (Proxy @"XX") ])
-instance                              GDCI U1                                              where gDCI _ = emptyDefClsInn
+class GDCISum (f :: Type -> Type)                                                   where gDCISum :: Proxy f -> DefClsInn -> DefClsInn
+instance (GDCISum f, GDCISum g)          => GDCISum (f :+: g)                       where gDCISum _ = gDCISum (Proxy @f) >>> gDCISum (Proxy @g)
+instance (KnownSymbol con, GDCIProd f) => GDCISum (C1 ('MetaCons con fix hasRec) f) where gDCISum _ = addCons @con >>> gDCIProd (Proxy @f) (enumVal @con)
 
-
-
-
+class GDCIProd (f :: Type -> Type)                                                            where gDCIProd :: Proxy f -> EnumVal -> DefClsInn -> DefClsInn
+instance (GDCIProd f, GDCIProd g) => GDCIProd (f :*: g)                                       where gDCIProd _ con = gDCIProd (Proxy @f) con >>> gDCIProd (Proxy @g) con
+instance (KnownSymbol field)      => GDCIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCIProd _ con = dciDefVars %~ (<>[Var $ "field_" <> evVal con <> "_" <> symbolVal (Proxy @field) ])
+instance                             GDCIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCIProd _ con = dciDefVars %~ (<>[Var $ "field_" <> evVal con ])
+instance                             GDCIProd U1                                              where gDCIProd _ _ = id
 
 
-
--- class MkC a                                                                                      where mkC :: DefCls -> Proxy a -> DefCls
--- instance (MkC f, KnownSymbol dat)        => MkC (M1 D ('MetaData _m dat _fn _isnt) f)            where mkC _ _  = mkC (emptyDefCls @dat) (Proxy @f)
--- instance (KnownSymbol con)               => MkC (C1 ('MetaCons con _fix hasRec) f)               where mkC dc _ = dc
--- instance (MkC f, MkC g, KnownSymbol con) => MkC (C1 ('MetaCons con _fix hasRec) f :+: g)         where mkC dc _ = mkC (addCons @con $ mkC dc (Proxy @f)) (Proxy @g)
--- instance (MkC f, MkC g, KnownSymbol con) => MkC (f :+: C1 ('MetaCons con _fix hasRec) g)         where mkC dc _ = mkC (addCons @con $ mkC dc (Proxy @f)) (Proxy @g)
--- instance (MkC f, MkC g)                  => MkC (f :*: g)                                        where mkC dc _ =  dc -- mkCSum Proxy
--- instance                                    MkC (S1 ('MetaSel ( 'Just field) su ss ds) (Rec0 f)) where mkC dc _ =  dc -- mkCSum Proxy
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- instance (Serializable a) => SR (K1 x a) where srG (K1 v) = ser v
---
--- instance SR U1                           where srG U1 = ""
-
-
--- | Represent a type as a godot Class
--- class ToCls a where
---   toCls :: DefCls
-
--- instance ToCls CliMsg where
---   toCls = DefCls "CliMsg" ExtendsObject (DefEnm "SrvMsgCon" [])
-
--- type family MkDefCls t :: DefCls
-
--- type instance MkDefCls CliMsg =
---   'DefCls
---     "CliMsg"
---     'ExtendsObject
---     '[ 'DefEnm "CliMsgCon" '[ "JOIN", "LEAVE", "ACTION", "GET_STATE" ] ]
---     '[]
---     '[]
---     '[]
-
--- type family ToStrExtends (t :: Extends) :: Symbol where
---   ToStrExtends 'ExtendsObject = "extends object"
---   ToStrExtends 'ExtendsReference = "extends reference"
-
--- type family ToStrDefEnms (as :: [DefEnm]) = (b :: Symbol) where
---   ToStrDefEnms '[] = ""
---   ToStrDefEnms (a ': as) = AppendSymbol (ToStrDefEnm a) (ToStrDefEnms as)
-
--- type family ToStrDefEnm (t :: DefEnm) = (r :: Symbol) where
---   ToStrDefEnm ('DefEnm nm vals) = AppendSymbol "enum" (ToStrDefEnmVals vals)
-
--- type family ToStrDefEnmVals (as :: [Symbol]) = (b :: Symbol) where
---   ToStrDefEnmVals '[] = ""
---   ToStrDefEnmVals (a ': as) = AppendSymbol a (ToStrDefEnmVals as)
-
-
--- type family ToStrDefCls (t :: DefCls) :: Symbol where
---   ToStrDefCls ( 'DefCls nm ext ens clss consts vars ) =
---      ("class_name " `AppendSymbol` nm `AppendSymbol` "\n\n"
---        `AppendSymbol` ToStrExtends ext `AppendSymbol` "\n"
---        `AppendSymbol` ToStrDefEnms ens `AppendSymbol` "\n"
---      )
 
 
 
