@@ -53,15 +53,15 @@ data Extends = ExtendsObject
   deriving (Eq,Show)
 
 -- | Godot primitive type label
-data PrimTyp t where
-  PTInt    :: PrimTyp Int
-  PTFloat  :: PrimTyp Double
-  PTString :: PrimTyp String
-  PTBool   :: PrimTyp Bool
-  PTV2     :: PrimTyp (V2 Double)
-  PTV3     :: PrimTyp (V3 Double)
-deriving instance Eq (PrimTyp t)
-deriving instance Show (PrimTyp t)
+data PrimTyp  where
+  PTInt    :: PrimTyp
+  PTFloat  :: PrimTyp
+  PTString :: PrimTyp
+  PTBool   :: PrimTyp
+  PTV2     :: PrimTyp
+  PTV3     :: PrimTyp
+deriving instance Eq (PrimTyp )
+deriving instance Show (PrimTyp )
 
 -- | Godot primitive value
 data PrimVal t where
@@ -75,10 +75,10 @@ deriving instance Eq (PrimVal t)
 deriving instance Show (PrimVal t)
 
 -- | Godot class type label
-data ClsTyp = ClsTyp deriving (Eq,Show)
+data ClsTyp deriving (Eq,Show)
 
 -- | Godot class value (list of optionally set fields)
-newtype ClsVal = ClsVal { cvVars :: forall t. [DefVar t] }
+newtype ClsVal = ClsVal { cvVars :: [DefVar ] }
 deriving instance Eq ClsVal
 deriving instance Show ClsVal
 
@@ -89,17 +89,17 @@ data ArrTyp = ArrTyp deriving (Eq,Show)
 newtype ArrVal a = ArrVal [a] deriving (Eq,Show)
 
 -- | Any godot type (primitives + custom classes + arrays)
-data Typ t where
-  TypPrim :: PrimTyp t -> Typ t
-  TypCls :: ClsName -> Typ ClsTyp
-  TypArr :: ArrVal (Typ t) -> Typ ArrTyp
+data Typ where
+  TypPrim :: PrimTyp -> Typ
+  TypCls :: ClsName -> Typ
+  TypArr :: ArrVal Typ  -> Typ
 
-deriving instance Eq (Typ t)
-deriving instance Show (Typ t)
+deriving instance Eq Typ
+deriving instance Show Typ
 
 data Val t where
   ValPrim :: PrimVal t -> Val t
-  ValCls :: ClsVal -> Val t
+  ValCls :: ClsVal -> Val ClsTyp
 
 -- | Main type representing GD script AST
 newtype Script = Script
@@ -107,14 +107,14 @@ newtype Script = Script
   }
 
 -- | Variable declaration
-data DefVar t = DefVar
+data DefVar = DefVar
   { varName :: VarName
-  , varValue :: Maybe (Typ t)
+  , varType :: Maybe Typ
   } deriving (Eq,Show)
 
 data DefFunc = DefFunc
-  { _dfArgs :: forall t. [DefVar t]
-  , _dfLocalVars :: forall t. [DefVar t]
+  { _dfArgs :: forall t. [DefVar]
+  , _dfLocalVars :: forall t. [DefVar]
   , _dfStmts :: [Stmt]
   }
 
@@ -143,8 +143,8 @@ deriving instance Show (Expr t)
 data DefClsInn = DefClsInn
   { _dciDefEnums :: Map String [EnumVal]
   , _dciDefClasses :: [DefCls]
-  , _dciDefConsts :: forall t. [DefVar t]
-  , _dciDefVars :: forall t. [DefVar t]
+  , _dciDefConsts :: [DefVar]
+  , _dciDefVars :: [DefVar]
   , _dciDefFuncs :: [DefFunc]
   }
 
@@ -197,10 +197,32 @@ extends #{ext}
 formatEnum :: (String, [EnumVal]) -> String
 formatEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} } |]
 
-formatVars :: DefVar t -> String
-formatVars (DefVar nm val ) = [i|var #{nm} = #{val} |]
+formatVars :: DefVar -> String
+formatVars (DefVar nm typ ) = [i|var #{formatVarName nm}: #{formatTyp typ} |]
+
+formatVarName (VarName nm) = nm
+
+formatTyp Nothing = ""
+formatTyp (Just (TypPrim PTInt   )) = "int"
+formatTyp (Just (TypPrim PTFloat )) = "flaot"
+formatTyp (Just (TypPrim PTString)) = "String"
+formatTyp (Just (TypPrim PTBool  )) = "bool"
+formatTyp (Just (TypPrim PTV2    )) = "Vector2"
+formatTyp (Just (TypPrim PTV3    )) = "Vector3"
+formatTyp (Just (TypCls (ClsName nm))) = nm
+formatTyp (Just t) = show t
 
 -- | Enrich DefCls with serialization and deserialization functions compatible with godot-ser serialization
 addSerialization :: DefCls -> DefCls
 addSerialization = dcInn . dciDefFuncs %~ (<> [])
+
+
+class ToTyp t where
+  toTyp :: Typ
+
+instance ToTyp Int where toTyp = TypPrim PTInt
+instance ToTyp Double where toTyp = TypPrim PTFloat
+instance ToTyp Float where toTyp = TypPrim PTFloat
+instance ToTyp String where toTyp = TypPrim PTString
+instance ToTyp (V2 n) where toTyp = TypPrim PTV2
 

@@ -40,12 +40,13 @@ data CliMsg
   | LEAVE Float
   | ACTION { act :: Action , integ :: Int}
   | BLA { xxx :: String}
+  | NEWCON { vec :: V2 Double}
   | GET_STATE
   deriving (Show, Generic)
 
 data Action = MOVE Int
             | FIRE Int
-  deriving (Show, Eq, Read)
+  deriving (Show, Eq, Read, Generic)
 
 -- genDefCls :: forall a. (MkC (Rep a)) => DefCls
 -- genDefCls = mkC (Proxy @(Rep a))
@@ -82,18 +83,48 @@ genDefCls :: forall a. (GDC (Rep a)) => DefCls
 genDefCls = gDC  (Proxy @(Rep a))
 
 
+-- | Generic generation of godot class from haskell type
+
 class GDC (f :: Type -> Type)                                                   where gDC :: Proxy f -> DefCls
-instance (GDCISum f, KnownSymbol dat) => GDC (M1 D ('MetaData dat m fn isnt) f) where gDC _  = DefCls (ClassName $ symbolVal (Proxy @dat)) ExtendsObject $ gDCISum (Proxy @f) mempty
+instance (GDCISum f, KnownSymbol dat) => GDC (M1 D ('MetaData dat m fn isnt) f) where gDC _  = DefCls (ClsName $ symbolVal (Proxy @dat)) ExtendsObject $ gDCISum (Proxy @f) mempty
 
 class GDCISum (f :: Type -> Type)                                                   where gDCISum :: Proxy f -> DefClsInn -> DefClsInn
 instance (GDCISum f, GDCISum g)          => GDCISum (f :+: g)                       where gDCISum _ = gDCISum (Proxy @f) >>> gDCISum (Proxy @g)
 instance (KnownSymbol con, GDCIProd f) => GDCISum (C1 ('MetaCons con fix hasRec) f) where gDCISum _ = addCons @con >>> gDCIProd (Proxy @f) (enumVal @con)
 
-class GDCIProd (f :: Type -> Type)                                                            where gDCIProd :: Proxy f -> EnumVal -> DefClsInn -> DefClsInn
-instance (GDCIProd f, GDCIProd g) => GDCIProd (f :*: g)                                       where gDCIProd _ con = gDCIProd (Proxy @f) con >>> gDCIProd (Proxy @g) con
-instance (KnownSymbol field)      => GDCIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCIProd _ con = dciDefVars %~ (<>[Var $ "field_" <> evVal con <> "_" <> symbolVal (Proxy @field) ])
-instance                             GDCIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCIProd _ con = dciDefVars %~ (<>[Var $ "field_" <> evVal con ])
-instance                             GDCIProd U1                                              where gDCIProd _ _ = id
+class GDCIProd (f :: Type -> Type)                                                                where gDCIProd :: Proxy f -> EnumVal -> DefClsInn -> DefClsInn
+instance (GDCIProd f, GDCIProd g)     => GDCIProd (f :*: g)                                       where gDCIProd _ con = gDCIProd (Proxy @f) con >>> gDCIProd (Proxy @g) con
+instance (KnownSymbol field, ToTyp f) => GDCIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCIProd _ con = dciDefVars %~ (<>[DefVar (VarName $ "field_" <> evVal con <> "_" <> symbolVal (Proxy @field)) (Just $ toTyp @f) ])
+instance (ToTyp f)                    => GDCIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCIProd _ con = dciDefVars %~ (<>[DefVar (VarName $ "field_" <> evVal con) (Just $ toTyp @f) ])
+instance                                 GDCIProd U1                                              where gDCIProd _ _ = id
+
+
+genToTyp :: forall a . (GToTyp (Rep a)) => Typ
+genToTyp = gToTyp (Proxy @(Rep a))
+
+class GToTyp (f :: Type -> Type)                                        where gToTyp :: Proxy f -> Typ
+instance (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m fn isnt) f) where gToTyp _  = TypCls $ ClsName $ symbolVal (Proxy @dat)
+
+instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a
+
+--
+-- genTypLbl :: forall a. (GTL (Rep a)) => String
+-- genTypLbl = gTL  (Proxy @(Rep a))
+
+-- | Generic generation of godot type label for haskell type
+--
+-- class GTL (f :: Type -> Type)                                                   where gTL :: Proxy f -> String
+-- instance (KnownSymbol dat) => GTL (M1 D ('MetaData dat m fn isnt) f) where gTL _  = symbolVal (Proxy @dat)
+
+-- class GTLISum (f :: Type -> Type)                                                   where gTLISum :: Proxy f -> DefClsInn -> DefClsInn
+-- instance (GTLISum f, GTLISum g)          => GTLISum (f :+: g)                       where gTLISum _ = gTLISum (Proxy @f) >>> gTLISum (Proxy @g)
+-- instance (KnownSymbol con, GTLIProd f) => GTLISum (C1 ('MetaCons con fix hasRec) f) where gTLISum _ = addCons @con >>> gTLIProd (Proxy @f) (enumVal @con)
+
+-- class GTLIProd (f :: Type -> Type)                                                            where gTLIProd :: Proxy f -> EnumVal -> DefClsInn -> DefClsInn
+-- instance (GTLIProd f, GTLIProd g) => GTLIProd (f :*: g)                                       where gTLIProd _ con = gTLIProd (Proxy @f) con >>> gTLIProd (Proxy @g) con
+-- instance (KnownSymbol field)      => GTLIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gTLIProd _ con = dciDefVars %~ (<>[DefVar (VarName $ "field_" <> evVal con <> "_" <> symbolVal (Proxy @field)) Nothing ])
+-- instance                             GTLIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gTLIProd _ con = dciDefVars %~ (<>[DefVar (VarName $ "field_" <> evVal con) Nothing ])
+-- instance                             GTLIProd U1                                              where gTLIProd _ _ = id
 
 
 
