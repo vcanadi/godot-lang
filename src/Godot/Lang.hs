@@ -5,7 +5,5 @@
 
 module Godot.Lang where
 
-import Godot.Lang.Kind
+import Godot.Lang.Core
 
-main = do
-  putStrLn "x"

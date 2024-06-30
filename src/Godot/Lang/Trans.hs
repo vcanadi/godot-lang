@@ -4,15 +4,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 
-module Godot.Lang.Kind where
+module Godot.Lang.Trans where
 
 import Linear.V2(V2)
 import Linear.V3(V3)
@@ -28,139 +25,21 @@ import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
 import Control.Arrow ((>>>))
 import Data.String.Interpolate (i)
 import Data.List (intercalate)
+import Godot.Lang.Core
 
--- | Godot language/script AST
--- Here are defined types which are lifted into kinds and whose values (as types) build godot's AST during compilation
+-- Translation from Haskell type into Godot class
 
--- | Name of the module
-newtype ClassName = ClassName String deriving (Eq, Show, Semigroup, Monoid)
-
--- | enum values
-newtype EnumVal = EnumVal { evVal :: String } deriving (Eq, Show, Semigroup, Monoid)
-
--- | Generate enum val from type level string (symbol)
-enumVal :: forall con. (KnownSymbol con) => EnumVal
-enumVal = EnumVal $ symbolVal (Proxy @con)
-
--- | Inheritacne 'extends' expression
-data Extends = ExtendsObject
-             | ExtendsReference
-  deriving (Eq,Show)
-
--- | Godot primitive types
-data Prim t where
-  PrimInt    :: Int       -> Prim Int
-  PrimFloat  :: Double    -> Prim Double
-  PrimString :: String    -> Prim String
-  PrimBool   :: Bool      -> Prim Bool
-  PrimV2     :: V2 Double -> Prim (V2 Double)
-  PrimV3     :: V3 Double -> Prim (V3 Double)
-
-data GType t where
-
-
--- | Any godot type (primitives + custom classes)
-data Typ t where
-  TypNat :: Prim t -> Typ (Prim t)
-  TypClass :: DefCls -> Typ DefCls
-
--- | Main type representing GD script AST
-newtype Script = Script
-  { gdsClass :: DefCls
-  }
-
--- | Variable declaration
-data Var  = Var
-  { varName :: String
-  -- , varValue :: Maybe GDType
-  -- , varType :: GDType
-  } deriving (Eq,Show)
-
-data DefClsInn = DefClsInn
-  { _dciDefEnums :: Map String [EnumVal]
-  , _dciDefClasses :: [DefCls]
-  , _dciDefConsts :: [Var]
-  , _dciDefVars :: [Var]
-  -- , dciFuncs :: [DefFunc]
-  } deriving (Eq,Show)
-
--- | Defintion of a godot type/class
-data DefCls = DefCls
-  { _dcName :: ClassName
-  , _dcExtends :: Extends
-  , _dcInn :: DefClsInn
-  } deriving (Eq,Show)
-
-$(makeLenses ''DefClsInn)
-$(makeLenses ''DefCls)
-
-
--- Combinators for building DefCls
-
-emptyDefCls :: forall cls. (KnownSymbol cls) => DefCls
-emptyDefCls  = DefCls (ClassName $ symbolVal (Proxy @cls)) ExtendsObject $ emptyDefClsInn
-
-emptyDefClsInn ::  DefClsInn
-emptyDefClsInn  = DefClsInn mempty [] [] []
-
-
--- | Join two DefClsInns by making a union of cons enum and union of its fields
-joinDefClsInn :: DefClsInn -> DefClsInn -> DefClsInn
-joinDefClsInn dci0 dci1 = DefClsInn (unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1)) [] [] (_dciDefVars dci0 <> _dciDefVars dci1)
-
-instance Semigroup DefClsInn where (<>) = joinDefClsInn
-instance Monoid DefClsInn where mempty =  emptyDefClsInn
-
-addToEnum :: String -> String -> DefClsInn -> DefClsInn
-addToEnum k v = dciDefEnums %~ insertWith (flip (<>)) k [EnumVal v]
-
--- | Add specific constructor to cons enum
+-- | Add specific constructor to Cons enum
 addCons :: forall (con :: Symbol). KnownSymbol con => DefClsInn -> DefClsInn
 addCons = addToEnum "Cons" (symbolVal (Proxy @con))
 
-
-
--- | Defintion of a godot function
--- data Func a b = Func
---   { defFuncArgs :: [Vars]
---   , defFuncLocals :: [Vars]
---   , defFuncStmts :: [Stms]
---   }
-
--- | GD script/language statement
--- data Stmt
---   = If GDBool Stmt (Maybe Stmt)
---   -- TODO: implement this
-
--- class GDType t where
---   GDType
-
-
--- instance AsText DefVar where
---   asText (DefVar nm val) = show nm "=" val
-
-formatDefCls :: DefCls -> String
-formatDefCls (DefCls (ClassName cls) ext (DefClsInn ens _ csts vars))  = [i|
-class_name #{cls}
-
-extends #{ext}
-
-#{unlines $ fmap formatEnum $ toList ens   }
-#{unlines $ fmap formatVars vars   }
-
-|]
-
-formatEnum :: (String, [EnumVal]) -> String
-formatEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} } |]
-
-formatVars :: Var -> String
-formatVars (Var nm ) = [i|var #{nm} |]
 
 
 data CliMsg
   = JOIN
   | LEAVE Float
   | ACTION { act :: Action , integ :: Int}
+  | BLA { xxx :: String}
   | GET_STATE
   deriving (Show, Generic)
 
@@ -199,15 +78,6 @@ data Action = MOVE Int
 -- instance (MkCField f, MkCField g) => MkCField (S1 ('MetaSel ('Just field) su  ss ds) f :*: S1 ('MetaSel ('Just field) su  ss ds) g)              where mkCField dc _ =  dc -- mkCSum Proxy
 
 
-
-
-
-
-
-
-
-
-
 genDefCls :: forall a. (GDC (Rep a)) => DefCls
 genDefCls = gDC  (Proxy @(Rep a))
 
@@ -224,8 +94,6 @@ instance (GDCIProd f, GDCIProd g) => GDCIProd (f :*: g)                         
 instance (KnownSymbol field)      => GDCIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCIProd _ con = dciDefVars %~ (<>[Var $ "field_" <> evVal con <> "_" <> symbolVal (Proxy @field) ])
 instance                             GDCIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCIProd _ con = dciDefVars %~ (<>[Var $ "field_" <> evVal con ])
 instance                             GDCIProd U1                                              where gDCIProd _ _ = id
-
-
 
 
 
