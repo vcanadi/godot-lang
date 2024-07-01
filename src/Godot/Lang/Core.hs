@@ -41,7 +41,7 @@ newtype EnumVal = EnumVal { evVal :: String } deriving (Eq, Show, Semigroup, Mon
 newtype VarName = VarName { vnName :: String } deriving (Eq, Show, Semigroup, Monoid)
 
 -- | Call to some godot function
-newtype CallFunc = CallFunc { cfFunc :: String } deriving (Eq, Show, Semigroup, Monoid)
+newtype FuncName = FuncName { cfFunc :: String } deriving (Eq, Show, Semigroup, Monoid)
 
 -- | Generate enum val from type level string (symbol)
 enumVal :: forall con. (KnownSymbol con) => EnumVal
@@ -52,7 +52,7 @@ data Extends = ExtendsObject
              | ExtendsReference
   deriving (Eq,Show)
 
--- | Godot primitive type label
+-- | Godot primitive type label (e.g. int, float, string)
 data PrimTyp  where
   PTInt    :: PrimTyp
   PTFloat  :: PrimTyp
@@ -63,7 +63,7 @@ data PrimTyp  where
 deriving instance Eq (PrimTyp )
 deriving instance Show (PrimTyp )
 
--- | Godot primitive value
+-- | Godot primitive value (e.g. 5, 4.0, "abc")
 data PrimVal t where
   PVInt    :: Int       -> PrimVal Int
   PVFloat  :: Double    -> PrimVal Double
@@ -74,7 +74,7 @@ data PrimVal t where
 deriving instance Eq (PrimVal t)
 deriving instance Show (PrimVal t)
 
--- | Godot class type label
+-- | Godot class type label (e.g.
 data ClsTyp deriving (Eq,Show)
 
 -- | Godot class value (list of optionally set fields)
@@ -113,7 +113,9 @@ data DefVar = DefVar
   } deriving (Eq,Show)
 
 data DefFunc = DefFunc
-  { _dfArgs :: forall t. [DefVar]
+  { _dfIsStat :: Bool
+  , _dfName :: FuncName
+  , _dfArgs :: forall t. [DefVar]
   , _dfLocalVars :: forall t. [DefVar]
   , _dfStmts :: [Stmt]
   }
@@ -122,7 +124,7 @@ deriving instance Eq DefFunc
 deriving instance Show DefFunc
 
 data Stmt
-  = StmtCallFunc CallFunc
+  = StmtCallFunc FuncName
   | StmtIf (Expr Bool) Stmt
   | StmtIfElse (Expr Bool) Stmt (Expr Bool) Stmt
   | StmtFor VarName (Expr Enumerable) Stmt
@@ -190,17 +192,21 @@ class_name #{cls}
 extends #{ext}
 
 #{unlines $ fmap formatEnum $ toList ens   }
-#{unlines $ fmap formatVars vars   }
+#{unlines $ fmap formatVar vars   }
+#{unlines $ fmap formatFunc funcs   }
 
 |]
 
 formatEnum :: (String, [EnumVal]) -> String
 formatEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} } |]
 
-formatVars :: DefVar -> String
-formatVars (DefVar nm typ ) = [i|var #{formatVarName nm}: #{formatTyp typ} |]
+formatVar :: DefVar -> String
+formatVar (DefVar nm typ ) = [i|var #{formatVarName nm}: #{formatTyp typ} |]
 
 formatVarName (VarName nm) = nm
+
+formatFunc :: DefFunc -> String
+formatFunc (DefFunc isSt nm [] [] []) = [i|#{if isSt then "static " else ""}func #{nm}() |]
 
 formatTyp Nothing = ""
 formatTyp (Just (TypPrim PTInt   )) = "int"
@@ -214,7 +220,8 @@ formatTyp (Just t) = show t
 
 -- | Enrich DefCls with serialization and deserialization functions compatible with godot-ser serialization
 addSerialization :: DefCls -> DefCls
-addSerialization = dcInn . dciDefFuncs %~ (<> [])
+addSerialization = dcInn . dciDefFuncs %~
+  (<> [DefFunc True (FuncName "show") [] [] []])
 
 
 class ToTyp t where
