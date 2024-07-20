@@ -10,6 +10,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 
 
 module Godot.Lang.Core where
@@ -25,6 +27,7 @@ import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C
 import Control.Lens.TH(makeLenses)
 import Control.Lens
 import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
+import qualified Data.Map.Strict as M
 import Control.Arrow ((>>>))
 import Data.String.Interpolate (i)
 import Data.List (intercalate)
@@ -35,7 +38,7 @@ import Data.List (intercalate)
 newtype ClsName = ClsName String deriving (Eq, Show, Semigroup, Monoid)
 
 -- | Enum values
-newtype EnumVal = EnumVal { evVal :: String } deriving (Eq, Show, Semigroup, Monoid)
+newtype EnumVal = EnumVal { evVal :: String } deriving (Eq, Ord, Show, Semigroup, Monoid)
 
 -- | Identifier
 newtype VarName = VarName { vnName :: String } deriving (Eq, Show, Semigroup, Monoid)
@@ -60,6 +63,8 @@ data PrimTyp  where
   PTBool   :: PrimTyp
   PTV2     :: PrimTyp
   PTV3     :: PrimTyp
+  PTArr    :: PrimTyp
+  PTByteArr :: PrimTyp
 deriving instance Eq (PrimTyp )
 deriving instance Show (PrimTyp )
 
@@ -75,7 +80,7 @@ deriving instance Eq (PrimVal t)
 deriving instance Show (PrimVal t)
 
 -- | Godot class type label (e.g.
-data ClsTyp deriving (Eq,Show)
+data ClsTyp = ClsTyp deriving (Eq,Show)
 
 -- | Godot class value (list of optionally set fields)
 newtype ClsVal = ClsVal { cvVars :: [DefVar ] }
@@ -109,48 +114,56 @@ newtype Script = Script
 -- | Variable declaration
 data DefVar = DefVar
   { varName :: VarName
-  , varType :: Maybe Typ
+  , varType :: Typ
   } deriving (Eq,Show)
 
 data DefFunc = DefFunc
   { _dfIsStat :: Bool
   , _dfName :: FuncName
-  , _dfArgs :: forall t. [DefVar]
-  , _dfLocalVars :: forall t. [DefVar]
-  , _dfStmts :: [Stmt]
+  , _dfArgs :: [DefVar]
+  , _dfOutTyp :: Typ
+  , _dfLocalVars :: [DefVar]
+  , _dfStmts :: forall t. [Stmt t]
   }
-
-deriving instance Eq DefFunc
 deriving instance Show DefFunc
 
-data Stmt
-  = StmtCallFunc FuncName
-  | StmtIf (Expr Bool) Stmt
-  | StmtIfElse (Expr Bool) Stmt (Expr Bool) Stmt
-  | StmtFor VarName (Expr Enumerable) Stmt
-   deriving (Eq,Show)
+data Stmt t where
+  StmtCallFunc :: FuncName -> Stmt t
+  StmtIf :: Expr Bool -> Stmt t -> Stmt t
+  StmtIfElse :: Expr Bool -> Stmt t -> Stmt t -> Stmt t
+  StmtFor :: VarName -> (Expr Enumerable) -> Stmt t -> Stmt t
+  StmtMatch :: Expr t -> [(Expr t, Stmt r)] -> Stmt r
+  StmtRet :: Expr t -> Stmt r
+deriving instance Show (Stmt t)
 
 -- | Type used for flaging godot expression acceptable for for loop
 data Enumerable = Enumerable
+
+-- | Type used for flaging godot raw expression
+data Raw = Raw
 
 data Expr t where
   ExprFalse :: Expr Bool
   ExprTrue :: Expr Bool
   ExprRange :: Int -> Int -> Int -> Expr Enumerable
   ExprRangeVar :: VarName -> Expr Enumerable
+  ExprStr :: String -> Expr Raw
+  ExprRaw :: String -> Expr Raw
 
 deriving instance Eq (Expr t)
 deriving instance Show (Expr t)
 
+-- | Main type describing godot class
 data DefClsInn = DefClsInn
-  { _dciDefEnums :: Map String [EnumVal]
+  { _dciDefEnums :: Map String [EnumVal] -- ^ Local class enums
+  , _dciDefConEnum :: [EnumVal] -- ^ Special enum representing constructor
   , _dciDefClasses :: [DefCls]
   , _dciDefConsts :: [DefVar]
+  , _dciDefConVars :: Map EnumVal [DefVar] -- ^ Godot's variables indexed with a constructor
   , _dciDefVars :: [DefVar]
   , _dciDefFuncs :: [DefFunc]
   }
 
-deriving instance Eq DefClsInn
 deriving instance Show DefClsInn
 
 -- | Defintion of a godot type/class
@@ -158,7 +171,7 @@ data DefCls = DefCls
   { _dcName :: ClsName
   , _dcExtends :: Extends
   , _dcInn :: DefClsInn
-  } deriving (Eq,Show)
+  } deriving (Show)
 
 $(makeLenses ''DefClsInn)
 $(makeLenses ''DefCls)
@@ -170,12 +183,21 @@ emptyDefCls :: forall cls. (KnownSymbol cls) => DefCls
 emptyDefCls  = DefCls (ClsName $ symbolVal (Proxy @cls)) ExtendsObject $ emptyDefClsInn
 
 emptyDefClsInn ::  DefClsInn
-emptyDefClsInn  = DefClsInn mempty [] [] [] []
+emptyDefClsInn  = DefClsInn mempty [] [] [] mempty [] []
 
 
 -- | Join two DefClsInns by making a union of enums and union of its fields
 joinDefClsInn :: DefClsInn -> DefClsInn -> DefClsInn
-joinDefClsInn dci0 dci1 = DefClsInn (unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1)) [] [] (_dciDefVars dci0 <> _dciDefVars dci1) (_dciDefFuncs dci0 <> _dciDefFuncs dci1)
+joinDefClsInn dci0 dci1 =
+  DefClsInn
+    (unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1))
+    (_dciDefConEnum dci0 <> _dciDefConEnum dci1)
+    (_dciDefClasses dci0 <> _dciDefClasses dci1)
+    (_dciDefConsts dci0 <> _dciDefConsts dci1)
+    (unionWith (<>) (_dciDefConVars dci0) (_dciDefConVars dci1))
+    (_dciDefVars dci0 <> _dciDefVars dci1)
+    (_dciDefFuncs dci0 <> _dciDefFuncs dci1)
+
 
 instance Semigroup DefClsInn where (<>) = joinDefClsInn
 instance Monoid DefClsInn where mempty =  emptyDefClsInn
@@ -183,46 +205,45 @@ instance Monoid DefClsInn where mempty =  emptyDefClsInn
 addToEnum :: String -> String -> DefClsInn -> DefClsInn
 addToEnum k v = dciDefEnums %~ insertWith (flip (<>)) k [EnumVal v]
 
--- Rendering of .gd files
+addToConEnum :: String -> DefClsInn -> DefClsInn
+addToConEnum v = dciDefConEnum %~ (<> [EnumVal v])
 
-formatDefCls :: DefCls -> String
-formatDefCls (DefCls (ClsName cls) ext (DefClsInn ens _ csts vars funcs))  = [i|
-class_name #{cls}
+addConDefVar :: forall field typ. (KnownSymbol field, ToTyp typ) => EnumVal -> DefClsInn -> DefClsInn
+addConDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [DefVar (VarName $ "field_" <> evVal con <> "_" <> symbolVal (Proxy @field)) (toTyp @typ) ]
 
-extends #{ext}
+addUnConDefVar :: forall typ. ToTyp typ => EnumVal -> DefClsInn -> DefClsInn
+addUnConDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [DefVar (VarName $ "field_" <> evVal con) (toTyp @typ) ]
 
-#{unlines $ fmap formatEnum $ toList ens   }
-#{unlines $ fmap formatVar vars   }
-#{unlines $ fmap formatFunc funcs   }
+addDefFunc :: DefFunc -> DefCls -> DefCls
+addDefFunc f dc = dc & over (dcInn . dciDefFuncs) (<> [f])
 
-|]
+addDefFuncs :: [DefFunc] -> DefCls -> DefCls
+addDefFuncs fs dc = dc & over (dcInn . dciDefFuncs) (<> fs)
 
-formatEnum :: (String, [EnumVal]) -> String
-formatEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} } |]
+addBasicFunctions :: DefCls -> DefCls
+addBasicFunctions = addSerialization
+                  . addConShow
 
-formatVar :: DefVar -> String
-formatVar (DefVar nm typ ) = [i|var #{formatVarName nm}: #{formatTyp typ} |]
+-- | Enrich DefCls with "con" enum with show function
+addConShow :: DefCls -> DefCls
+addConShow dc = (`addDefFunc` dc) $
+  DefFunc False (FuncName "show") [] (TypPrim PTString) []
+        [ StmtMatch (ExprRaw "self.con")
+           [(ExprRaw $ "Con." <> en , StmtRet (ExprStr en)) | EnumVal en <- _dciDefConEnum $ _dcInn dc]
+        ]
 
-formatVarName (VarName nm) = nm
-
-formatFunc :: DefFunc -> String
-formatFunc (DefFunc isSt nm [] [] []) = [i|#{if isSt then "static " else ""}func #{nm}() |]
-
-formatTyp Nothing = ""
-formatTyp (Just (TypPrim PTInt   )) = "int"
-formatTyp (Just (TypPrim PTFloat )) = "flaot"
-formatTyp (Just (TypPrim PTString)) = "String"
-formatTyp (Just (TypPrim PTBool  )) = "bool"
-formatTyp (Just (TypPrim PTV2    )) = "Vector2"
-formatTyp (Just (TypPrim PTV3    )) = "Vector3"
-formatTyp (Just (TypCls (ClsName nm))) = nm
-formatTyp (Just t) = show t
-
--- | Enrich DefCls with serialization and deserialization functions compatible with godot-ser serialization
+-- | Enrich DefCls with serialization function compatible with godot-ser serialization
 addSerialization :: DefCls -> DefCls
-addSerialization = dcInn . dciDefFuncs %~
-  (<> [DefFunc True (FuncName "show") [] [] []])
+addSerialization dc = (`addDefFuncs` dc)
+  [ DefFunc True (FuncName "serArr") [DefVar (VarName "this") $ TypCls $ _dcName dc] (TypPrim PTArr) []
+      [
+      ]
+  , DefFunc True (FuncName "ser") [DefVar (VarName "this") $ TypCls $ _dcName dc] (TypPrim PTByteArr) []
+      [StmtRet $ ExprRaw "var_to_bytes(serArr(this))"]
+  ]
 
+
+  -- static func ser(m: CliMsg) -> PackedByteArray: return var_to_bytes(serArr(m))
 
 class ToTyp t where
   toTyp :: Typ
