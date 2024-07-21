@@ -35,24 +35,38 @@ import Data.List (intercalate)
 import Data.Bool(bool)
 
 import Godot.Lang.Core
+import Control.Monad.Reader (Reader)
 
 -- Rendering of .gd files
 
 addIndent :: String -> String
-addIndent = unlines . fmap ("  " <>) . lines
+addIndent = intercalate "\n" . fmap ("  " <>) . lines
+
+newtype FmtState = FmtState { fsIndent :: Int }
+
+type FmtR = Reader FmtState
+
+-- | Separate with a newline
+breakLines :: [String] -> String
+breakLines = intercalate "\n"
+
+-- | Separate with a newline and extra empty newline
+breakSpacedLines :: [String] -> String
+breakSpacedLines = intercalate "\n\n"
+
 
 fmtDefCls :: DefCls -> String
-fmtDefCls (DefCls (ClsName cls) ext (DefClsInn enms conEnm _ defConsts defConVars defVars defFuncs)) =
-  [i|
-class_name #{cls} extends #{if ext == ExtendsObject then "object" else "reference"}
+fmtDefCls (DefCls (ClsName cls) ext (DefClsInn enms _ defConsts defConVars defVars defFuncs)) =
+  [i|class_name #{cls} extends #{if ext == ExtendsObject then "object" else "reference"}
 
-#{addIndent $ fmtEnum ("Con", conEnm)   }
-#{addIndent $ concat $ fmap fmtEnum $ toList enms   }
-#{addIndent $ intercalate "\n" $ fmap fmtDefVar (defVars <> (concat $ snd <$> toList defConVars))  }
-#{addIndent $ concat $ fmap fmtDefFunc defFuncs   } |]
+#{addIndent $ breakLines $ fmap fmtEnum $ ("Con", fst <$> toList defConVars) : toList enms   }
+
+#{addIndent $ breakLines $ fmap fmtDefVar (defVars <> (concat $ snd <$> toList defConVars))  }
+
+#{addIndent $ breakSpacedLines $ fmap fmtDefFunc defFuncs   } |]
 
 fmtEnum :: (String, [EnumVal]) -> String
-fmtEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} } |]
+fmtEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} }|]
 
 fmtDefVar :: DefVar -> String
 fmtDefVar (DefVar nm typ ) =
@@ -63,7 +77,7 @@ fmtVarName (VarName nm) = nm
 fmtDefFunc :: DefFunc -> String
 fmtDefFunc (DefFunc isSt (FuncName nm) args outTyp vars stmts) =
   [i|#{bool "" "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
-#{addIndent $ concatMap fmtStmt stmts}|]
+#{addIndent $ breakLines $ fmtStmt <$> stmts}|]
 
 fmtStmt (StmtCallFunc (FuncName fn)) = fn <> "()"
 fmtStmt (StmtIf e s) = [i|if #{fmtBoolExpr e}: #{fmtStmt s} |]
@@ -72,6 +86,9 @@ fmtStmt (StmtFor v l s) = [i|for #{fmtVarName v} in #{fmtRangeExpr l} else: #{fm
 fmtStmt (StmtMatch e css) = [i|match #{fmtExpr e}:
 #{addIndent $ concatMap (\(e',s) -> fmtExpr e' <>": "<> fmtStmt s <> "\n") css} |]
 fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
+fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
+fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
+fmtStmt (StmtSet vns e) = [i|#{intercalate "." $ vnName <$> vns} = #{fmtExpr e}|]
 
 fmtBoolExpr :: Expr Bool -> String
 fmtBoolExpr ExprTrue = "true"
@@ -86,14 +103,15 @@ fmtExpr ExprFalse = "False"
 fmtExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
 fmtExpr (ExprRangeVar v) = fmtVarName v
 fmtExpr (ExprStr s) = [i|"#{s}"|]
+fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExpr <$> es)} ] |]
 fmtExpr (ExprRaw s) = s
 
 fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtDefVar <$> args
 
-
+fmtTyp :: Typ -> String
 fmtTyp (TypPrim PTInt    ) = "int"
-fmtTyp (TypPrim PTFloat  ) = "flaot"
+fmtTyp (TypPrim PTFloat  ) = "float"
 fmtTyp (TypPrim PTString ) = "String"
 fmtTyp (TypPrim PTBool   ) = "bool"
 fmtTyp (TypPrim PTV2     ) = "Vector2"
@@ -101,4 +119,4 @@ fmtTyp (TypPrim PTV3     ) = "Vector3"
 fmtTyp (TypPrim PTArr    ) = "Array"
 fmtTyp (TypPrim PTByteArr) = "PackedByteArray"
 fmtTyp (TypCls (ClsName nm)) = nm
-fmtTyp t = show t
+fmtTyp (TypEnum enm) = enm
