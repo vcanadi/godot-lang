@@ -142,28 +142,28 @@ data DefFunc = DefFunc
   , _dfArgs :: [DefVar]
   , _dfOutTyp :: Typ
   , _dfLocalVars :: [DefVar]
-  , _dfStmts :: forall t. [Stmt t]
+  , _dfStmts :: [Stmt]
   }
 deriving instance Show DefFunc
 
 -- | Combinator for easier DefFunc construction
-defFunc :: String -> [DefVar] -> Typ -> [DefVar] -> (forall (t :: k). [Stmt t]) -> DefFunc
+-- defFunc :: String -> [DefVar] -> Typ -> [DefVar] -> (forall (t :: k). [Stmt]) -> DefFunc
 defFunc fn = DefFunc False (FuncName fn)
 
 -- | Combinator for easier static DefFunc construction
-defStatFunc :: String -> [DefVar] -> Typ -> [DefVar] -> (forall (t :: k). [Stmt t]) -> DefFunc
+-- defStatFunc :: String -> [DefVar] -> Typ -> [DefVar] -> (forall (t :: k). [Stmt]) -> DefFunc
 defStatFunc fn = DefFunc True (FuncName fn)
 
-data Stmt t where
-  StmtCallFunc :: FuncName -> Stmt t
-  StmtIf :: Expr Bool -> Stmt t -> Stmt t
-  StmtIfElse :: Expr Bool -> Stmt t -> Stmt t -> Stmt t
-  StmtFor :: VarName -> (Expr Enumerable) -> Stmt t -> Stmt t
-  StmtMatch :: Expr r -> [(Expr r, Stmt t)] -> Stmt t
-  StmtRet :: Expr r -> Stmt t
-  StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt r
-  StmtSet :: [VarName] -> Expr t -> Stmt r
-deriving instance Show (Stmt t)
+data Stmt where
+  StmtCallFunc :: FuncName -> Stmt
+  StmtIf :: Expr Bool -> Stmt -> Stmt
+  StmtIfElse :: Expr Bool -> Stmt -> Stmt -> Stmt
+  StmtFor :: VarName -> (Expr Enumerable) -> Stmt -> Stmt
+  StmtMatch :: Expr r -> [(Expr r, Stmt)] -> Stmt
+  StmtRet :: Expr r -> Stmt
+  StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
+  StmtSet :: [VarName] -> Expr t -> Stmt
+deriving instance Show Stmt
 
 -- | Type used for flaging godot expression acceptable for for loop
 data Enumerable = Enumerable

@@ -35,7 +35,6 @@ import Data.List (intercalate)
 import Data.Bool(bool)
 
 import Godot.Lang.Core
-import Control.Monad.Reader (Reader)
 
 -- Rendering of .gd files
 
@@ -43,8 +42,6 @@ addIndent :: String -> String
 addIndent = intercalate "\n" . fmap ("  " <>) . lines
 
 newtype FmtState = FmtState { fsIndent :: Int }
-
-type FmtR = Reader FmtState
 
 -- | Separate with a newline
 breakLines :: [String] -> String
