@@ -21,6 +21,7 @@ dependencies:
   - text
   - interpolate
   - containers
+  - template-haskell
 
 library:
   source-dirs: src

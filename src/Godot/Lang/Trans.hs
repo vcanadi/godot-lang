@@ -7,6 +7,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 
 module Godot.Lang.Trans where
@@ -27,6 +28,7 @@ import Data.String.Interpolate (i)
 import Data.List (intercalate)
 import Godot.Lang.Core
 import Godot.Lang.Format
+import Language.Haskell.TH (Q, Exp, runIO)
 
 -- Translation from Haskell type into Godot class
 
@@ -49,6 +51,12 @@ data Action = MOVE Int
 
 -- Generic generation of godot class from haskell type
 --
+-- | Generate GD script of a class for a corresponging type
+genGDScript :: forall a. (GDC (Rep a)) => FilePath -> IO ()
+genGDScript dir =  writeFile (dir <> "/" <> cnName (_dcName dc) <> ".gd") $ fmtDefCls dc
+    where
+      dc = addBasicFunctions $ genDefCls @a
+
 -- | Wrapper function. For a type with GCD instance on its representation, build DefCls generically
 genDefCls :: forall a. (GDC (Rep a)) => DefCls
 genDefCls = gDC  (Proxy @(Rep a))
@@ -82,3 +90,8 @@ instance (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m fn isnt) f) where gT
 
 -- | For any type with Generic instance, default to gToType as type name/label
 instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a
+
+generateGDScript :: Q Exp
+generateGDScript = do
+    runIO $ genGDScript @CliMsg "./gd-autogen"
+    [| "This string is generated at compile-time." |]

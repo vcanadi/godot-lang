@@ -13,7 +13,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 
-
 module Godot.Lang.Format where
 
 import Godot.Lang.Core
