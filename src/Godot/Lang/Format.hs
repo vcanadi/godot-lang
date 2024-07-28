@@ -80,7 +80,7 @@ fmtStmt (StmtIf e s) = [i|if #{fmtBoolExpr e}: #{fmtStmt s} |]
 fmtStmt (StmtIfElse e s s') = [i|if #{fmtBoolExpr e}: #{fmtStmt s} else: #{fmtStmt s} |]
 fmtStmt (StmtFor v l s) = [i|for #{fmtVarName v} in #{fmtRangeExpr l} else: #{fmtStmt s} |]
 fmtStmt (StmtMatch e css) = [i|match #{fmtExpr e}:
-#{addIndent $ concatMap (\(e',s) -> fmtExpr e' <>": "<> fmtStmt s <> "\n") css} |]
+#{addIndent $ concatMap (\(e',ss) -> fmtExpr e' <>":" <> (if length ss == 1 then "" else "\n") <> unlines (addIndent . fmtStmt  <$> ss)) css} |]
 fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
 fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
 fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]

@@ -159,7 +159,7 @@ data Stmt where
   StmtIf :: Expr Bool -> Stmt -> Stmt
   StmtIfElse :: Expr Bool -> Stmt -> Stmt -> Stmt
   StmtFor :: VarName -> (Expr Enumerable) -> Stmt -> Stmt
-  StmtMatch :: Expr r -> [(Expr r, Stmt)] -> Stmt
+  StmtMatch :: Expr r -> [(Expr r, [Stmt])] -> Stmt
   StmtRet :: Expr r -> Stmt
   StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
   StmtSet :: [VarName] -> Expr t -> Stmt
@@ -256,6 +256,7 @@ addDefFuncs fs dc = dc & over (dcInn . dciDefFuncs) (<> fs)
 
 addBasicFunctions :: DefCls -> DefCls
 addBasicFunctions = addSerialization
+                  . addDeserialization
                   . addConShow
                   . addCons
 
@@ -264,17 +265,17 @@ addConShow :: DefCls -> DefCls
 addConShow dc = (`addDefFunc` dc) $
   DefFunc False (FuncName "show") [] (TypPrim PTString) []
         [ StmtMatch (ExprRaw "self.con")
-           [(ExprRaw $ "Con." <> con , StmtRet (ExprStr con)) | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc]
+           [(ExprRaw $ "Con." <> con , [StmtRet (ExprStr con)]) | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc]
         ]
 
 -- | Enrich DefCls with "constructor" functions for each constructor in sum type
 addCons :: DefCls -> DefCls
 addCons dc = (`addDefFuncs` dc) $ ((toList $ _dciDefConVars $ _dcInn dc) <&>) $ \(EnumVal con, vs) ->
   defStatFunc (toLower <$> con) (join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars $ _dcInn dc) (TypCls $ _dcName dc) [] $
-    [ StmtVarInit (DefVar (VarName "this") (TypCls $ _dcName dc )) (Just $ ExprRaw $ cnName (_dcName dc) <> ".new()") ] <>
-    [ StmtSet [VarName "this", VarName "con"] (ExprRaw $ "Con." <> con) ] <>
-    [ StmtSet [VarName "this", vn] (ExprRaw (vnName vn)) | DefVar vn _ <- vs ] <>
-    [ StmtRet (ExprRaw "this") ]
+    [ StmtVarInit (DefVar (VarName "ret") (TypCls $ _dcName dc )) (Just $ ExprRaw $ cnName (_dcName dc) <> ".new()") ] <>
+    [ StmtSet [VarName "ret", VarName "con"] (ExprRaw $ "Con." <> con) ] <>
+    [ StmtSet [VarName "ret", vn] (ExprRaw (vnName vn)) | DefVar vn _ <- vs ] <>
+    [ StmtRet (ExprRaw "ret") ]
 
 -- | Enrich DefCls with serialization function compatible with godot-ser serialization
 addSerialization :: DefCls -> DefCls
@@ -283,15 +284,44 @@ addSerialization dc = (`addDefFuncs` dc)
   [ defStatFunc "serArr" [DefVar (VarName "this") $ TypCls $ _dcName dc] (TypPrim PTArr) []
       [ StmtMatch (ExprRaw "this.con") $ ((toList $ _dciDefConVars $ _dcInn dc) <&>) $ \(EnumVal con, vs) ->
          ( ExprRaw $ "Con." <> con
-         , StmtRet $ ExprArr $
+         , [StmtRet $ ExprArr $
              ((ExprRaw $ "Con." <> con) :) $ (vs <&>) $ \(DefVar (VarName vn) typ) ->
                  if isPrimTyp typ
                     then ExprRaw vn
                     else ExprRaw $ vn <> ".serArr()"
+           ]
          )
       ]
   -- | Serialize to binary
   , defStatFunc "ser" [DefVar (VarName "this") $ TypCls $ _dcName dc] (TypPrim PTByteArr) []
       [StmtRet $ ExprRaw "var_to_bytes(serArr(this))"]
   ]
+
+-- | Enrich DefCls with deserialization function compatible with godot-ser serialization
+addDeserialization :: DefCls -> DefCls
+addDeserialization dc = (`addDefFuncs` dc)
+  -- | Deserialize from nested array
+  [ defStatFunc "desArr" [DefVar (VarName "arr") $ TypPrim PTArr] (TypCls $ _dcName dc) []
+      [ StmtVarInit (DefVar (VarName "ret") (TypCls $ _dcName dc )) (Just $ ExprRaw $ cnName (_dcName dc) <> ".new()")
+      , StmtMatch (ExprRaw "arr[0]") $ ((filter (not . null . snd) $ toList $ _dciDefConVars $ _dcInn dc) <&>) $ \(EnumVal con, vs) ->
+         ( ExprRaw $ "Con." <> con
+         , [ StmtSet [VarName "ret", VarName vn] (ExprRaw $ "arr[" <> show i <> "]" <> (if isPrimTyp typ then "" else ".desArr()"))
+           | (i, DefVar (VarName vn) typ) <- zip [1..] vs
+           ]
+         )
+      , StmtRet (ExprRaw "ret")
+      ]
+      -- [ StmtVarInit (DefVar (VarName "this") (TypCls $ _dcName dc )) (Just $ ExprRaw $ cnName (_dcName dc) <> ".new()")
+      -- , StmtSet [VarName "this", VarName "con"] (ExprRaw "arr[0]")
+      -- ] <>
+      -- [ StmtSet [VarName "this", v] (ExprRaw "arr[0]")
+      -- | DefVar v _ <- join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars $ _dcInn dc]
+
+
+  -- | Deserialize to binary
+  , defStatFunc "des" [DefVar (VarName "this") $ TypPrim PTByteArr] (TypCls $ _dcName dc) []
+      [StmtRet $ ExprRaw "desArr(bytes_to_var(bs))"]
+  ]
+
+
 
