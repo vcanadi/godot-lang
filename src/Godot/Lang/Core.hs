@@ -42,8 +42,10 @@ class ToTyp t where
 instance ToTyp Int where toTyp = TypPrim PTInt
 instance ToTyp Double where toTyp = TypPrim PTFloat
 instance ToTyp Float where toTyp = TypPrim PTFloat
-instance ToTyp String where toTyp = TypPrim PTString
 instance ToTyp (V2 n) where toTyp = TypPrim PTV2
+instance {-# OVERLAPPABLE #-} ToTyp [a] where toTyp = TypArr
+instance ToTyp String where toTyp = TypPrim PTString
+instance ToTyp (Map k a) where toTyp = TypDict
 
 
 -- Godot language AST
@@ -107,6 +109,7 @@ data Typ where
   TypPrim :: PrimTyp -> Typ
   TypCls :: ClsName -> Typ
   TypArr :: Typ
+  TypDict :: Typ
   TypEnum :: String -> Typ
 deriving instance Eq Typ
 deriving instance Show Typ

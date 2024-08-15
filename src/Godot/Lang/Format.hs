@@ -115,5 +115,6 @@ fmtTyp (TypPrim PTV3     )   = "Vector3"
 fmtTyp (TypPrim PTArr    )   = "Array"
 fmtTyp (TypPrim PTByteArr)   = "PackedByteArray"
 fmtTyp TypArr                =  "Array"
+fmtTyp TypDict               =  "Dictionary"
 fmtTyp (TypCls (ClsName nm)) = nm
 fmtTyp (TypEnum enm) = enm

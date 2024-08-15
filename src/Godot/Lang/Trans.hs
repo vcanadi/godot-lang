@@ -43,6 +43,7 @@ data CliMsg
   | BLA { xxx :: String}
   | NEWCON { vec :: V2 Double}
   | GET_STATE { st :: [Float]}
+  | GET_STATE2 { st2 :: Map Float String}
   -- | GET_MAP { mp :: Map Int Float}
   deriving (Show, Generic)
 
@@ -88,9 +89,9 @@ genToTyp = gToTyp (Proxy @(Rep a))
 -- | Typeclass whose instances (generic representations) know their type name/label
 class GToTyp (f :: Type -> Type)                                                              where gToTyp :: Proxy f -> Typ
 instance {-# OVERLAPPABLE #-} (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m fn isnt) f)  where gToTyp _  = TypCls $ ClsName $ symbolVal (Proxy @dat)
-instance {-# OVERLAPS #-}                          GToTyp (M1 D ('MetaData "[]" m fn isnt) f) where gToTyp _  = TypArr
+-- instance {-# OVERLAPS #-}                          GToTyp (M1 D ('MetaData "[]" m fn isnt) f) where gToTyp _  = TypArr
 
--- | For any type with Generic instance, default to gToType as type name/label
+-- | For any type with Generic instance, default to gToTyp as type name/label
 instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a
 
 generateGDScript :: Q Exp
