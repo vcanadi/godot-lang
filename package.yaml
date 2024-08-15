@@ -22,6 +22,7 @@ dependencies:
   - interpolate
   - containers
   - template-haskell
+  - pretty-simple
 
 library:
   source-dirs: src

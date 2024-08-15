@@ -106,13 +106,14 @@ fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtDefVar <$> args
 
 fmtTyp :: Typ -> String
-fmtTyp (TypPrim PTInt    ) = "int"
-fmtTyp (TypPrim PTFloat  ) = "float"
-fmtTyp (TypPrim PTString ) = "String"
-fmtTyp (TypPrim PTBool   ) = "bool"
-fmtTyp (TypPrim PTV2     ) = "Vector2"
-fmtTyp (TypPrim PTV3     ) = "Vector3"
-fmtTyp (TypPrim PTArr    ) = "Array"
-fmtTyp (TypPrim PTByteArr) = "PackedByteArray"
+fmtTyp (TypPrim PTInt    )   = "int"
+fmtTyp (TypPrim PTFloat  )   = "float"
+fmtTyp (TypPrim PTString )   = "String"
+fmtTyp (TypPrim PTBool   )   = "bool"
+fmtTyp (TypPrim PTV2     )   = "Vector2"
+fmtTyp (TypPrim PTV3     )   = "Vector3"
+fmtTyp (TypPrim PTArr    )   = "Array"
+fmtTyp (TypPrim PTByteArr)   = "PackedByteArray"
+fmtTyp TypArr                =  "Array"
 fmtTyp (TypCls (ClsName nm)) = nm
 fmtTyp (TypEnum enm) = enm

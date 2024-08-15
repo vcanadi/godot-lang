@@ -42,7 +42,8 @@ data CliMsg
   | ACTION { act :: Action , integ :: Int}
   | BLA { xxx :: String}
   | NEWCON { vec :: V2 Double}
-  | GET_STATE
+  | GET_STATE { st :: [Float]}
+  -- | GET_MAP { mp :: Map Int Float}
   deriving (Show, Generic)
 
 data Action = MOVE Int
@@ -67,14 +68,14 @@ instance (GDCISum f, KnownSymbol dat) => GDC (M1 D ('MetaData dat m fn isnt) f) 
 
 -- | "GenericDefCls" logic on generic sum type
 class GDCISum (f :: Type -> Type)                                                   where gDCISum :: Proxy f -> DefClsInn -> DefClsInn
-instance (GDCISum f, GDCISum g)          => GDCISum (f :+: g)                       where gDCISum _ = gDCISum (Proxy @f) >>> gDCISum (Proxy @g)
+instance (GDCISum f, GDCISum g)        => GDCISum (f :+: g)                         where gDCISum _ = gDCISum (Proxy @f) >>> gDCISum (Proxy @g)
 instance (KnownSymbol con, GDCIProd f) => GDCISum (C1 ('MetaCons con fix hasRec) f) where gDCISum _ = addCon @con >>> gDCIProd (Proxy @f) (enumVal @con)
 
 -- | "GenericDefCls" logic on generic product type
 class GDCIProd (f :: Type -> Type)                                                                where gDCIProd :: Proxy f -> EnumVal -> DefClsInn -> DefClsInn
 instance (GDCIProd f, GDCIProd g)     => GDCIProd (f :*: g)                                       where gDCIProd _ = (>>>) <$> gDCIProd (Proxy @f) <*> gDCIProd (Proxy @g)
-instance (KnownSymbol field, ToTyp f) => GDCIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCIProd _ = addConDefVar @field @f
-instance (ToTyp f)                    => GDCIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCIProd _ = addUnConDefVar @f
+instance (KnownSymbol field, ToTyp f) => GDCIProd (S1 ('MetaSel ('Just field) su ss ds) (Rec0 f)) where gDCIProd _ = addRecConDefVar @field @f
+instance (ToTyp f)                    => GDCIProd (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))      where gDCIProd _ = addConDefVar @f
 instance                                 GDCIProd U1                                              where gDCIProd _ = const id
 
 -- Generic represenation of a type name/label
@@ -85,8 +86,9 @@ genToTyp :: forall a . (GToTyp (Rep a)) => Typ
 genToTyp = gToTyp (Proxy @(Rep a))
 
 -- | Typeclass whose instances (generic representations) know their type name/label
-class GToTyp (f :: Type -> Type)                                        where gToTyp :: Proxy f -> Typ
-instance (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m fn isnt) f) where gToTyp _  = TypCls $ ClsName $ symbolVal (Proxy @dat)
+class GToTyp (f :: Type -> Type)                                                              where gToTyp :: Proxy f -> Typ
+instance {-# OVERLAPPABLE #-} (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m fn isnt) f)  where gToTyp _  = TypCls $ ClsName $ symbolVal (Proxy @dat)
+instance {-# OVERLAPS #-}                          GToTyp (M1 D ('MetaData "[]" m fn isnt) f) where gToTyp _  = TypArr
 
 -- | For any type with Generic instance, default to gToType as type name/label
 instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a
@@ -94,4 +96,4 @@ instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @
 generateGDScript :: Q Exp
 generateGDScript = do
     runIO $ genGDScript @CliMsg "./gd-autogen"
-    [| "This string is generated at compile-time." |]
+    [| "This string is gen erated at compile-time." |]

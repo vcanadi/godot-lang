@@ -106,6 +106,7 @@ newtype ArrVal a = ArrVal [a] deriving (Eq,Show)
 data Typ where
   TypPrim :: PrimTyp -> Typ
   TypCls :: ClsName -> Typ
+  TypArr :: Typ
   TypEnum :: String -> Typ
 deriving instance Eq Typ
 deriving instance Show Typ
@@ -148,10 +149,12 @@ deriving instance Show DefFunc
 
 -- | Combinator for easier DefFunc construction
 -- defFunc :: String -> [DefVar] -> Typ -> [DefVar] -> (forall (t :: k). [Stmt]) -> DefFunc
+defFunc :: String -> [DefVar] -> Typ -> [DefVar] -> [Stmt] -> DefFunc
 defFunc fn = DefFunc False (FuncName fn)
 
 -- | Combinator for easier static DefFunc construction
 -- defStatFunc :: String -> [DefVar] -> Typ -> [DefVar] -> (forall (t :: k). [Stmt]) -> DefFunc
+defStatFunc :: String -> [DefVar] -> Typ -> [DefVar] -> [Stmt] -> DefFunc
 defStatFunc fn = DefFunc True (FuncName fn)
 
 data Stmt where
@@ -242,11 +245,11 @@ addToEnum k v = dciDefEnums %~ insertWith (flip (<>)) k [EnumVal v]
 addToConEnum :: String -> DefClsInn -> DefClsInn
 addToConEnum v = dciDefConVars %~ M.insert (EnumVal v) []
 
-addConDefVar :: forall field typ. (KnownSymbol field, ToTyp typ) => EnumVal -> DefClsInn -> DefClsInn
-addConDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [defVar @typ ("field_" <> evVal con <> "_" <> symbolVal (Proxy @field)) ]
+addRecConDefVar :: forall field typ. (KnownSymbol field, ToTyp typ) => EnumVal -> DefClsInn -> DefClsInn
+addRecConDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [defVar @typ ("field_" <> evVal con <> "_" <> symbolVal (Proxy @field)) ]
 
-addUnConDefVar :: forall typ. ToTyp typ => EnumVal -> DefClsInn -> DefClsInn
-addUnConDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [defVar @typ ("field_" <> evVal con)]
+addConDefVar :: forall typ. ToTyp typ => EnumVal -> DefClsInn -> DefClsInn
+addConDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [defVar @typ ("field_" <> evVal con)]
 
 addDefFunc :: DefFunc -> DefCls -> DefCls
 addDefFunc f dc = dc & over (dcInn . dciDefFuncs) (<> [f])

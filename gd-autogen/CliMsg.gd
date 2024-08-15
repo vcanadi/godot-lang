@@ -5,6 +5,7 @@ class_name CliMsg extends object
   var field_ACTION_act: Action
   var field_ACTION_integ: int
   var field_BLA_xxx: String
+  var field_GET_STATE_st: Array
   var field_LEAVE: float
   var field_NEWCON_vec: Vector2
 
@@ -21,9 +22,10 @@ class_name CliMsg extends object
     ret.field_BLA_xxx = field_BLA_xxx
     return ret 
   
-  static func get_state() -> CliMsg:
+  static func get_state(var field_GET_STATE_st: Array) -> CliMsg:
     var ret: CliMsg = CliMsg.new() 
     ret.con = Con.GET_STATE
+    ret.field_GET_STATE_st = field_GET_STATE_st
     return ret 
   
   static func join() -> CliMsg:
@@ -59,6 +61,7 @@ class_name CliMsg extends object
         ret.field_ACTION_act = arr[1].desArr()
         ret.field_ACTION_integ = arr[2]
       Con.BLA:  ret.field_BLA_xxx = arr[1]
+      Con.GET_STATE:  ret.field_GET_STATE_st = arr[1].desArr()
       Con.LEAVE:  ret.field_LEAVE = arr[1]
       Con.NEWCON:  ret.field_NEWCON_vec = arr[1] 
     return ret 
@@ -70,7 +73,7 @@ class_name CliMsg extends object
     match this.con:
       Con.ACTION:  return  [ Con.ACTION, field_ACTION_act.serArr(), field_ACTION_integ ]  
       Con.BLA:  return  [ Con.BLA, field_BLA_xxx ]  
-      Con.GET_STATE:  return  [ Con.GET_STATE ]  
+      Con.GET_STATE:  return  [ Con.GET_STATE, field_GET_STATE_st.serArr() ]  
       Con.JOIN:  return  [ Con.JOIN ]  
       Con.LEAVE:  return  [ Con.LEAVE, field_LEAVE ]  
       Con.NEWCON:  return  [ Con.NEWCON, field_NEWCON_vec ]   
