@@ -34,6 +34,7 @@ import Data.List (intercalate)
 import Data.Bool(bool)
 
 import Godot.Lang.Core
+import Data.Maybe (fromMaybe)
 
 -- Rendering of .gd files
 
@@ -49,7 +50,6 @@ breakLines = intercalate "\n"
 -- | Separate with a newline and extra empty newline
 breakSpacedLines :: [String] -> String
 breakSpacedLines = intercalate "\n\n"
-
 
 fmtDefCls :: DefCls -> String
 fmtDefCls (DefCls (ClsName cls) ext (DefClsInn enms _ defConsts defConVars defVars defFuncs)) =
@@ -71,11 +71,12 @@ fmtDefVar (DefVar nm typ ) =
 fmtVarName (VarName nm) = nm
 
 fmtDefFunc :: DefFunc -> String
-fmtDefFunc (DefFunc isSt (FuncName nm) args outTyp vars stmts) =
-  [i|#{bool "" "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
+fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp vars stmts) =
+  [i|# #{fromMaybe "TODO: Add comment" comm}
+#{bool "" "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
 #{addIndent $ breakLines $ fmtStmt <$> stmts}|]
 
-fmtStmt (StmtCallFunc (FuncName fn)) = fn <> "()"
+fmtStmt (StmtApp e) = fmtExpr e
 fmtStmt (StmtIf e s) = [i|if #{fmtBoolExpr e}: #{fmtStmt s} |]
 fmtStmt (StmtIfElse e s s') = [i|if #{fmtBoolExpr e}: #{fmtStmt s} else: #{fmtStmt s} |]
 fmtStmt (StmtFor v l s) = [i|for #{fmtVarName v} in #{fmtRangeExpr l} else: #{fmtStmt s} |]
@@ -93,14 +94,19 @@ fmtBoolExpr ExprFalse = "False"
 fmtRangeExpr :: Expr Enumerable -> String
 fmtRangeExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
 
+fmtExprElem :: ExprElem -> String
+fmtExprElem (ExprElem e) = fmtExpr e
+
 fmtExpr :: Expr t -> String
 fmtExpr ExprTrue = "true"
 fmtExpr ExprFalse = "False"
 fmtExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
 fmtExpr (ExprRangeVar v) = fmtVarName v
 fmtExpr (ExprStr s) = [i|"#{s}"|]
-fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExpr <$> es)} ] |]
+fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExprElem <$> es)} ] |]
 fmtExpr (ExprRaw s) = s
+fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> (intercalate ", " (fmtExpr <$> args)) <> ")"
+fmtExpr (ExprLam (VarName vn) e) = "func(" <> vn <> "): " <> fmtExpr e
 
 fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtDefVar <$> args
@@ -112,9 +118,8 @@ fmtTyp (TypPrim PTString )   = "String"
 fmtTyp (TypPrim PTBool   )   = "bool"
 fmtTyp (TypPrim PTV2     )   = "Vector2"
 fmtTyp (TypPrim PTV3     )   = "Vector3"
-fmtTyp (TypPrim PTArr    )   = "Array"
 fmtTyp (TypPrim PTByteArr)   = "PackedByteArray"
-fmtTyp TypArr                =  "Array"
+fmtTyp (TypArr _)            =  "Array"
 fmtTyp TypDict               =  "Dictionary"
 fmtTyp (TypCls (ClsName nm)) = nm
 fmtTyp (TypEnum enm) = enm

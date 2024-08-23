@@ -38,13 +38,10 @@ addCon = addToConEnum (symbolVal (Proxy @con))
 
 data CliMsg
   = JOIN
-  | LEAVE Float
-  | ACTION { act :: Action , integ :: Int}
-  | BLA { xxx :: String}
-  | NEWCON { vec :: V2 Double}
-  | GET_STATE { st :: [Float]}
-  | GET_STATE2 { st2 :: Map Float String}
-  -- | GET_MAP { mp :: Map Int Float}
+  | LEAVE String
+  | ACTION { act :: Action , time :: Int, vec :: V2 Double}
+  | GET_LISTS { glList :: [Float], glList2 :: [Action] }
+  | GET_MAP { gmMap :: Map Float String}
   deriving (Show, Generic)
 
 data Action = MOVE Int
