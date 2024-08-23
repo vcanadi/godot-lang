@@ -1,8 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Godot.Lang.TH where
+module Godot.Lang.Example.TH where
 
 import Godot.Lang.Trans
+import Godot.Lang.Example.CliMsg
 
 main :: IO ()
 main = do

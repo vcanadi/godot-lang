@@ -7,8 +7,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 
 module Godot.Lang.Trans where
 
@@ -35,18 +33,6 @@ import Language.Haskell.TH (Q, Exp, runIO)
 -- | Add specific constructor to Con enum
 addCon :: forall (con :: Symbol). KnownSymbol con => DefClsInn -> DefClsInn
 addCon = addToConEnum (symbolVal (Proxy @con))
-
-data CliMsg
-  = JOIN
-  | LEAVE String
-  | ACTION { act :: Action , time :: Int, vec :: V2 Double}
-  | GET_LISTS { glList :: [Float], glList2 :: [Action] }
-  | GET_MAP { gmMap :: Map Float String}
-  deriving (Show, Generic)
-
-data Action = MOVE Int
-            | FIRE Int
-  deriving (Show, Eq, Read, Generic)
 
 -- Generic generation of godot class from haskell type
 --
@@ -91,7 +77,3 @@ instance {-# OVERLAPPABLE #-} (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m
 -- | For any type with Generic instance, default to gToTyp as type name/label
 instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a
 
-generateGDScript :: Q Exp
-generateGDScript = do
-    runIO $ genGDScript @CliMsg "./gd-autogen"
-    [| "This string is gen erated at compile-time." |]
