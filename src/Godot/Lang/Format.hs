@@ -107,6 +107,7 @@ fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExprElem <$> es)} ] |]
 fmtExpr (ExprRaw s) = s
 fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> (intercalate ", " (fmtExpr <$> args)) <> ")"
 fmtExpr (ExprLam (VarName vn) e) = "func(" <> vn <> "): " <> fmtExpr e
+fmtExpr (ExprAny e) = fmtExpr e
 
 fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtDefVar <$> args
@@ -119,7 +120,8 @@ fmtTyp (TypPrim PTBool   )   = "bool"
 fmtTyp (TypPrim PTV2     )   = "Vector2"
 fmtTyp (TypPrim PTV3     )   = "Vector3"
 fmtTyp (TypPrim PTByteArr)   = "PackedByteArray"
-fmtTyp (TypArr _)            =  "Array"
+fmtTyp (TypArr t)            = "Array[" <>  fmtTyp t <> "]"
 fmtTyp TypDict               =  "Dictionary"
 fmtTyp (TypCls (ClsName nm)) = nm
 fmtTyp (TypEnum enm) = enm
+fmtTyp TypAny  = "Variant"

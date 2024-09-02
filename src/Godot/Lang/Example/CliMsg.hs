@@ -12,7 +12,7 @@ data CliMsg
   = JOIN
   | LEAVE String
   | ACTION { act :: Action , time :: Int, vec :: V2 Double}
-  | GET_LISTS { glList :: [Float], glList2 :: [Action] }
+  | GET_LISTS { glList :: [[Float]], glList2 :: [Action], glList3 :: [[[Action]]] }
   | GET_MAP { gmMap :: Map Float String}
   deriving (Show, Generic)
 
