@@ -85,7 +85,7 @@ fmtStmt (StmtMatch e css) = [i|match #{fmtExpr e}:
 fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
 fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
 fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
-fmtStmt (StmtSet vns e) = [i|#{intercalate "." $ vnName <$> vns} = #{fmtExpr e}|]
+fmtStmt (StmtSet (Iden id') e) = [i|#{intercalate "." id'} = #{fmtExpr e}|]
 
 fmtBoolExpr :: Expr Bool -> String
 fmtBoolExpr ExprTrue = "true"
@@ -121,7 +121,9 @@ fmtTyp (TypPrim PTV2     )   = "Vector2"
 fmtTyp (TypPrim PTV3     )   = "Vector3"
 fmtTyp (TypPrim PTByteArr)   = "PackedByteArray"
 fmtTyp (TypArr t)            = "Array[" <>  fmtTyp t <> "]"
-fmtTyp TypDict               =  "Dictionary"
+fmtTyp (TypPair t t')        = "Pair" <> fmtTyp t <> fmtTyp t'
+fmtTyp (TypDict t t')        = "Dictionary[" <> fmtTyp t <> ", " <> fmtTyp t' <> "]"
 fmtTyp (TypCls (ClsName nm)) = nm
 fmtTyp (TypEnum enm) = enm
 fmtTyp TypAny  = "Variant"
+
