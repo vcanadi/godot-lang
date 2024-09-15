@@ -79,7 +79,9 @@ fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp vars stmts) =
 fmtStmt (StmtApp e) = fmtExpr e
 fmtStmt (StmtIf e s) = [i|if #{fmtBoolExpr e}: #{fmtStmt s} |]
 fmtStmt (StmtIfElse e s s') = [i|if #{fmtBoolExpr e}: #{fmtStmt s} else: #{fmtStmt s} |]
-fmtStmt (StmtFor v l s) = [i|for #{fmtVarName v} in #{fmtRangeExpr l} else: #{fmtStmt s} |]
+fmtStmt (StmtFor v l s) = [i|
+for #{fmtVarName v} in #{fmtRangeExpr l}:
+#{addIndent $ unlines $ fmtStmt <$> s} |]
 fmtStmt (StmtMatch e css) = [i|match #{fmtExpr e}:
 #{addIndent $ concatMap (\(e',ss) -> fmtExpr e' <>":" <> (if length ss == 1 then "" else "\n") <> unlines (addIndent . fmtStmt  <$> ss)) css} |]
 fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
@@ -93,6 +95,7 @@ fmtBoolExpr ExprFalse = "False"
 
 fmtRangeExpr :: Expr Enumerable -> String
 fmtRangeExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
+fmtRangeExpr (ExprRangeVar (VarName v)) = [i|#{v}|]
 
 fmtExprElem :: ExprElem -> String
 fmtExprElem (ExprElem e) = fmtExpr e

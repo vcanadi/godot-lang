@@ -8,14 +8,33 @@ import Data.Map (Map)
 import GHC.Generics (Generic)
 import Language.Haskell.TH (Q, Exp, runIO)
 import Godot.Lang.Core (ToTyp (toTyp), Typ (TypPrim), PrimTyp (PTString))
+import Data.Word (Word16, Word32)
 
-data Action = Action Model deriving (Show, Eq, Generic)
+newtype PortNumber = PortNum Word16 deriving (Eq, Ord, Show, Generic)
+type HostAddress = Word32
+type FlowInfo = Word32
+type ScopeID = Word32
+type HostAddress6 = (Word32, Word32, Word32, Word32)
 
-data SrvMsg = PUT_STATE Model [Action]
+data SockAddr
+  = SockAddrInet
+        PortNumber      -- sin_port
+        HostAddress     -- sin_addr  (ditto)
+  | SockAddrInet6
+        PortNumber      -- sin6_port
+        FlowInfo        -- sin6_flowinfo (ditto)
+        HostAddress6    -- sin6_addr (ditto)
+        ScopeID         -- sin6_scope_id (ditto)
+  -- | The path must have fewer than 104 characters. All of these characters must have code points less than 256.
+  | SockAddrUnix
+        String           -- sun_path
+  deriving (Eq, Ord, Show, Generic)
+
+newtype SrvMsg = PUT_STATE Model
   deriving (Show, Eq, Generic)
 
 -- | State of the game (client info and board coordinates)
-type Model = Map String Loc
+type Model = Map SockAddr (Map String Loc)
 
 data Loc = Loc
   { _mX :: Int

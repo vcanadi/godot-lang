@@ -167,7 +167,7 @@ data Stmt where
   StmtApp :: Expr App -> Stmt
   StmtIf :: Expr Bool -> Stmt -> Stmt
   StmtIfElse :: Expr Bool -> Stmt -> Stmt -> Stmt
-  StmtFor :: VarName -> (Expr Enumerable) -> Stmt -> Stmt
+  StmtFor :: VarName -> (Expr Enumerable) -> [Stmt] -> Stmt
   StmtMatch :: Expr r -> [(Expr r, [Stmt])] -> Stmt
   StmtRet :: Expr r -> Stmt
   StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
