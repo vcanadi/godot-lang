@@ -12,6 +12,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Godot.Lang.Format where
 
@@ -34,12 +35,12 @@ import Data.List (intercalate)
 import Data.Bool(bool)
 
 import Godot.Lang.Core
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 
 -- Rendering of .gd files
 
 addIndent :: String -> String
-addIndent = intercalate "\n" . fmap ("  " <>) . lines
+addIndent = unlines . fmap ("  " <>) . lines
 
 newtype FmtState = FmtState { fsIndent :: Int }
 
@@ -52,27 +53,34 @@ breakSpacedLines :: [String] -> String
 breakSpacedLines = intercalate "\n\n"
 
 fmtDefCls :: DefCls -> String
-fmtDefCls (DefCls (ClsName cls) ext (DefClsInn enms _ defConsts defConVars defVars defFuncs)) =
-  [i|class_name #{cls} extends #{if ext == ExtendsObject then "object" else "reference"}
+fmtDefCls (DefCls (ClsName cls) ext DefClsInn{..})
+  = [i|class #{cls} extends #{if ext == ExtendsObject then "Object" else "Reference"}:
 
-#{addIndent $ breakLines $ fmap fmtEnum $ ("Con", fst <$> toList defConVars) : toList enms   }
-
-#{addIndent $ breakLines $ fmap fmtDefVar (defVars <> (concat $ snd <$> toList defConVars))  }
-
-#{addIndent $ breakSpacedLines $ fmap fmtDefFunc defFuncs   } |]
+|]
+  <> (breakLines $ catMaybes
+  [ if null _dciDefClasses then Nothing else Just $ addIndent (breakLines $ fmap fmtDefCls _dciDefClasses  )
+  , if null enums then Nothing else Just $ addIndent (breakLines $ fmap fmtEnum enums)
+  , Just $ addIndent "var con: Con"
+  , Just $ addIndent (breakLines $ fmap fmtDefVar (_dciDefVars <> concatMap snd (toList _dciDefConVars)))
+  , Just $ addIndent (breakSpacedLines $ fmap fmtDefFunc _dciDefFuncs )
+  ])
+  where
+    enums = ("Con", fst <$> toList _dciDefConVars) : toList _dciDefEnums
 
 fmtEnum :: (String, [EnumVal]) -> String
 fmtEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} }|]
 
 fmtDefVar :: DefVar -> String
-fmtDefVar (DefVar nm typ ) =
-  [i|var #{fmtVarName nm}: #{fmtTyp typ}|]
+fmtDefVar v = [i|var #{fmtVar v}|]
+
+fmtVar :: DefVar -> String
+fmtVar (DefVar nm typ ) = [i|#{fmtVarName nm}: #{fmtTyp typ}|]
 
 fmtVarName (VarName nm) = nm
 
 fmtDefFunc :: DefFunc -> String
-fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp vars stmts) =
-  [i|# #{fromMaybe "TODO: Add comment" comm}
+fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp vars stmts)
+  = [i|# #{fromMaybe "TODO: Add comment" comm}
 #{bool "" "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
 #{addIndent $ breakLines $ fmtStmt <$> stmts}|]
 
@@ -82,8 +90,12 @@ fmtStmt (StmtIfElse e s s') = [i|if #{fmtBoolExpr e}: #{fmtStmt s} else: #{fmtSt
 fmtStmt (StmtFor v l s) = [i|
 for #{fmtVarName v} in #{fmtRangeExpr l}:
 #{addIndent $ unlines $ fmtStmt <$> s} |]
-fmtStmt (StmtMatch e css) = [i|match #{fmtExpr e}:
-#{addIndent $ concatMap (\(e',ss) -> fmtExpr e' <>":" <> (if length ss == 1 then "" else "\n") <> unlines (addIndent . fmtStmt  <$> ss)) css} |]
+fmtStmt (StmtMatch e (css, othMb))
+  = (<>) [i|match #{fmtExpr e}:|] $ addIndent $ (`concatMap` css) $ \(e',ss) -> "\n" <>
+    [i|#{fmtExpr e'}:\n#{unlines (addIndent . fmtStmt  <$> ss)}|] <>
+    maybe "" (\oth -> [i|_:\n#{unlines (addIndent . fmtStmt <$> oth)}|]) othMb
+
+
 fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
 fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
 fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
@@ -108,25 +120,13 @@ fmtExpr (ExprRangeVar v) = fmtVarName v
 fmtExpr (ExprStr s) = [i|"#{s}"|]
 fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExprElem <$> es)} ] |]
 fmtExpr (ExprRaw s) = s
-fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> (intercalate ", " (fmtExpr <$> args)) <> ")"
+fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> intercalate ", " (fmtExpr <$> args) <> ")"
 fmtExpr (ExprLam (VarName vn) e) = "func(" <> vn <> "): " <> fmtExpr e
 fmtExpr (ExprAny e) = fmtExpr e
 
 fmtArgs :: [DefVar] -> String
-fmtArgs args = intercalate ", "  $ fmtDefVar <$> args
+fmtArgs args = intercalate ", "  $ fmtVar <$> args
 
 fmtTyp :: Typ -> String
-fmtTyp (TypPrim PTInt    )   = "int"
-fmtTyp (TypPrim PTFloat  )   = "float"
-fmtTyp (TypPrim PTString )   = "String"
-fmtTyp (TypPrim PTBool   )   = "bool"
-fmtTyp (TypPrim PTV2     )   = "Vector2"
-fmtTyp (TypPrim PTV3     )   = "Vector3"
-fmtTyp (TypPrim PTByteArr)   = "PackedByteArray"
-fmtTyp (TypArr t)            = "Array[" <>  fmtTyp t <> "]"
-fmtTyp (TypPair t t')        = "Pair" <> fmtTyp t <> fmtTyp t'
-fmtTyp (TypDict t t')        = "Dictionary[" <> fmtTyp t <> ", " <> fmtTyp t' <> "]"
-fmtTyp (TypCls (ClsName nm)) = nm
-fmtTyp (TypEnum enm) = enm
-fmtTyp TypAny  = "Variant"
+fmtTyp = showTyp
 

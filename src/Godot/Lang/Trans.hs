@@ -33,14 +33,12 @@ import Language.Haskell.TH (Q, Exp, runIO)
 -- Helpers
 --
 -- | "Horizontal" max size (max number of fields of any product)
-class MSzH (f :: * -> *)           where mSzH :: Proxy f -> Int
-instance (MSzH f, MSzH g)
-         => MSzH (f :+: g)         where mSzH _ = max (mSzH (Proxy @f)) (mSzH (Proxy @g))
-instance (MSzH f, MSzH g)
-         => MSzH (f :*: g)         where mSzH _ = mSzH (Proxy @f) + mSzH (Proxy @g)
-instance MSzH (K1 i c)             where mSzH _ = 1
-instance MSzH f => MSzH (M1 i t f) where mSzH _ = mSzH (Proxy @f)
-instance MSzH U1                   where mSzH _ = 0
+class MSzH (f :: * -> *)                    where mSzH :: Proxy f -> Int
+instance (MSzH f, MSzH g) => MSzH (f :+: g) where mSzH _ = max (mSzH (Proxy @f)) (mSzH (Proxy @g))
+instance (MSzH f, MSzH g) => MSzH (f :*: g) where mSzH _ = mSzH (Proxy @f) + mSzH (Proxy @g)
+instance MSzH (K1 i c)                      where mSzH _ = 1
+instance MSzH f => MSzH (M1 i t f)          where mSzH _ = mSzH (Proxy @f)
+instance MSzH U1                            where mSzH _ = 0
 
 -- Translation from Haskell type into Godot class
 
@@ -72,8 +70,8 @@ instance (KnownSymbol con, GDCIπ f) => GDCIΣ (C1 ('MetaCons con fix hasRec) f)
 -- | "GenericDefCls" logic on generic product type
 class GDCIπ (f :: Type -> Type)                                                            where gDCIπ :: Int -> Proxy f -> EnumVal -> DefClsInn -> DefClsInn
 instance (GDCIπ f, GDCIπ g, MSzH f) => GDCIπ (f :*: g)                                     where gDCIπ i _ = (>>>) <$> gDCIπ i (Proxy @f) <*> gDCIπ (i + mSzH (Proxy @f)) (Proxy @g)
-instance (KnownSymbol fld, ToTyp f) => GDCIπ (S1 ('MetaSel ('Just fld) su ss ds) (Rec0 f)) where gDCIπ _ _ = addRecDefVar @fld @f
-instance (ToTyp f)                  => GDCIπ (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))    where gDCIπ i _ = addConDefVar @f i
+instance (KnownSymbol fld, ToTyp f) => GDCIπ (S1 ('MetaSel ('Just fld) su ss ds) (Rec0 f)) where gDCIπ _ _ = addRecDefVar @fld (toTyp @f)
+instance (ToTyp f)                  => GDCIπ (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))    where gDCIπ i _ = addConDefVar i (toTyp @f)
 instance                               GDCIπ U1                                            where gDCIπ _ _ = const id
 
 -- Generic represenation of a type name/label

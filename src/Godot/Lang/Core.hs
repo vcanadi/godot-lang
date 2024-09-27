@@ -45,7 +45,7 @@ instance ToTyp (V2 n) where toTyp = TypPrim PTV2
 instance (ToTyp a, ToTyp b) => ToTyp (a, b) where toTyp = TypPair (toTyp @a) (toTyp @b)
 instance {-# OVERLAPPABLE #-} ToTyp a => ToTyp [a] where toTyp = TypArr (toTyp @a)
 instance ToTyp String where toTyp = TypPrim PTString
-instance (ToTyp k, ToTyp v) => ToTyp (Map k v) where toTyp = TypDict (toTyp @k) (toTyp @v)
+instance (ToTyp k, ToTyp v) => ToTyp (Map k v) where toTyp = TypArr (TypPair (toTyp @k) (toTyp @v)) -- ^ Represent Map as a list of pairs instead of Dictionary to keep the type information
 
 
 -- Godot language AST
@@ -111,12 +111,48 @@ data Typ where
   TypPrim :: PrimTyp -> Typ -- ^ Primitive type
   TypCls :: ClsName -> Typ -- ^ Custom class
   TypArr :: Typ -> Typ -- ^ Array
-  TypPair :: Typ -> Typ -> Typ -- ^ Pair of values
+  TypPair :: Typ -> Typ -> Typ -- ^ Pair of values. Special type that is represented as custom inner type (since godot doesn't have type parameters)
   TypDict :: Typ -> Typ -> Typ -- ^ Dictionary
   TypEnum :: String -> Typ -- ^ Enum type
   TypAny :: Typ  -- ^ Any type flag
 deriving instance Eq Typ
 deriving instance Show Typ
+
+-- showTyp :: Typ -> String
+-- showTyp (TypPrim pt) = show pt
+-- showTyp (TypCls (ClsName nm)) = nm
+-- showTyp (TypArr _) = "Arr"
+-- showTyp (TypPair a b) = "Pair<" <> showTyp a <> ", " <>  showTyp b <> ">"
+-- showTyp (TypDict _ _) = "Dict"
+-- showTyp (TypEnum _) = "Enum"
+-- showTyp TypAny = "Any"
+
+showTyp :: Typ -> String
+showTyp = f 0
+  where
+    f :: Int -> Typ -> String
+    f i (TypArr t)            = "Array[" <>  f (succ i) t <> "]"
+    f i (TypDict t t')        = "Dictionary[" <> f (succ i) t <> ", " <> f (succ i) t' <> "]"
+    f _ t = pairName t
+
+-- | Build Type name for Pair types
+pairName :: Typ -> String
+pairName = f 0
+  where
+    f :: Int -> Typ -> String
+    f _ (TypPrim PTInt    )   = "int"
+    f _ (TypPrim PTFloat  )   = "float"
+    f _ (TypPrim PTString )   = "String"
+    f _ (TypPrim PTBool   )   = "bool"
+    f _ (TypPrim PTV2     )   = "Vector2"
+    f _ (TypPrim PTV3     )   = "Vector3"
+    f _ (TypPrim PTByteArr)   = "PackedByteArray"
+    f i (TypArr t)            = "A_" <> f (succ i) t <> "_A"
+    f i (TypPair t t')        = "P_" <> f (succ i) t <> "_"  <> f (succ i) t' <> "_P"
+    f i (TypDict t t')        = "D_" <> f (succ i) t <> "_D"
+    f _ (TypCls (ClsName nm)) = nm
+    f _ (TypEnum enm) = enm
+    f _ TypAny  = "Variant"
 
 data Val where
   ValPrim :: PrimVal -> Val
@@ -168,7 +204,7 @@ data Stmt where
   StmtIf :: Expr Bool -> Stmt -> Stmt
   StmtIfElse :: Expr Bool -> Stmt -> Stmt -> Stmt
   StmtFor :: VarName -> (Expr Enumerable) -> [Stmt] -> Stmt
-  StmtMatch :: Expr r -> [(Expr r, [Stmt])] -> Stmt
+  StmtMatch :: Expr r -> ([(Expr r, [Stmt])], Maybe [Stmt])  -> Stmt
   StmtRet :: Expr r -> Stmt
   StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
   StmtSet :: Iden -> Expr t -> Stmt
@@ -271,17 +307,19 @@ addToConEnum :: String -> DefClsInn -> DefClsInn
 addToConEnum v = dciDefConVars %~ M.insert (EnumVal v) []
 
 -- | Add a variable definition that holds some sum type constructor's record value
-addRecDefVar :: forall fld typ. (KnownSymbol fld, ToTyp typ) => EnumVal -> DefClsInn -> DefClsInn
-addRecDefVar con = dciDefConVars %~ insertWith (flip (<>)) con [defVar' @typ ("fld_" <> evVal con <> "_" <> symbolVal (Proxy @fld)) ]
+-- Additionally construct class inner type in case that is wanted (e.g. if type is a TypPair (helper type collection mimicing type variables))
+addRecDefVar :: forall fld typ. (KnownSymbol fld) => Typ -> EnumVal -> DefClsInn -> DefClsInn
+addRecDefVar typ con = (dciDefConVars %~ insertWith (flip (<>)) con [symbolVal (Proxy @fld) -:: typ ])
+                     . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
 
 -- | Add a variable definition that holds some sum type constructor's unnamed value
-addConDefVar :: forall typ. ToTyp typ => Int -> EnumVal -> DefClsInn -> DefClsInn
-addConDefVar i con = dciDefConVars %~ insertWith (flip (<>)) con [defVar' @typ ("fld_" <> evVal con <> "_" <> show i)]
+addConDefVar :: Int -> Typ -> EnumVal -> DefClsInn -> DefClsInn
+addConDefVar i typ con = (dciDefConVars %~ insertWith (flip (<>)) con [("fld_" <> evVal con <> "_" <> show i) -:: typ])
+                       . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
 
--- | Add function definition
-addDefFunc :: DefFunc -> DefCls -> DefCls
-addDefFunc f dc = dc & over (dcInn . dciDefFuncs) (<> [f])
-
--- | Add multple function definitions
-addDefFuncs :: [DefFunc] -> DefCls -> DefCls
-addDefFuncs fs dc = dc & over (dcInn . dciDefFuncs) (<> fs)
+addTypPairCls :: Typ -> Typ -> DefClsInn -> DefClsInn
+addTypPairCls a b = dciDefClasses %~ (mkTypPairCls:)
+  where
+    mkTypPairCls = DefCls (ClsName $ pairName (TypPair a b)) ExtendsObject
+                     (emptyDefClsInn & addRecDefVar @"fst" a (EnumVal "P")
+                                     & addRecDefVar @"snd" b (EnumVal "P"))

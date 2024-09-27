@@ -30,13 +30,14 @@ data SockAddr
         String           -- sun_path
   deriving (Eq, Ord, Show, Generic)
 
-newtype SrvMsg = PUT_STATE Model
+newtype SrvMsg = PUT_STATE { model :: Model }
   deriving (Show, Eq, Generic)
 
--- | State of the game (client info and board coordinates)
-type Model = Map SockAddr (Map String Loc)
 
-data Loc = Loc
+-- | State of the game (client info and board coordinates)
+type Model = Map SockAddr Pos
+
+data Pos = Pos
   { _mX :: Int
   , _mY :: Int
   } deriving (Show, Eq, Generic)

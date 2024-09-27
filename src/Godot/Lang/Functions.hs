@@ -40,42 +40,54 @@ addBasicFunctions = addSerialization
 
 -- | Enrich DefCls with "constructor" functions for each constructor in sum type
 addCons :: DefCls -> DefCls
-addCons dc@DefCls{..} = (`addDefFuncs` dc) $
-  [ defStatFunc ("Constructor function for sum constructor " <> con)
-      (toLower <$> con) (join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName ) [] $
-      [ ("ret" -:: TypCls _dcName) -:= ExprRaw (cnName _dcName <> ".new()")
-      , ["ret", "con"] --= exprCon con ] <>
-      [ ["ret",  vn] --= ExprRaw vn | DefVar (VarName vn) _ <- vs ] <>
-      [ StmtRet (ExprRaw "ret") ]
-  | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
-  ]
+addCons dc@DefCls{..} = dc & dcInn . dciDefFuncs %~ (<> fs)
+                           & dcInn . dciDefClasses %~ fmap addCons
+  where
+    fs =
+      [ defStatFunc ("Constructor function for sum constructor " <> con)
+          (toLower <$> con) (join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName ) [] $
+          [ ("ret" -:: TypCls _dcName) -:= ExprRaw (cnName _dcName <> ".new()")
+          , ["ret", "con"] --= exprCon con ] <>
+          [ ["ret",  vn] --= ExprRaw vn | DefVar (VarName vn) _ <- vs ] <>
+          [ StmtRet (ExprRaw "ret") ]
+      | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+      ]
 
 -- | Enrich DefCls  with show function (shows only constructor name)
 addConShow :: DefCls -> DefCls
-addConShow dc = (`addDefFunc` dc) $
-  DefFunc False (Just "String representation of type") (FuncName "show") [] (TypPrim PTString) []
-        [ StmtMatch (ExprRaw "self.con")
-            [(exprCon con , [StmtRet $ ExprStr con])
-            | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc]
-        ]
+addConShow dc = dc & dcInn . dciDefFuncs %~ (<> [f])
+                   & dcInn . dciDefClasses %~ fmap addConShow
+  where
+    f = DefFunc False (Just "String representation of type") (FuncName "show") [] (TypPrim PTString) []
+      [ StmtMatch (ExprRaw "self.con")
+          ( [(exprCon con , [StmtRet $ ExprStr con])
+            | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc
+            ]
+          , Just [StmtRet $ ExprRaw "\"\""] )
+      ]
+
 
 
 -- Serializing expressions
 --
 -- | Enrich DefCls with serialization function compatible with godot-ser serialization
 addSerialization :: DefCls -> DefCls
-addSerialization dc@DefCls{..} = (`addDefFuncs` dc)
-  [ defStatFunc "Serialize to array"
-      "serToArr" ["this" -:: TypCls _dcName ] (TypArr TypAny) []
-      [ StmtMatch (ExprRaw "this.con")
-          [ (exprCon con , [ StmtRet $ exprClsSer con vs])
-          | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+addSerialization dc@DefCls{..} = dc & dcInn . dciDefFuncs %~ (<> fs)
+                                    & dcInn . dciDefClasses %~ fmap addSerialization
+  where
+    fs =
+      [ defStatFunc "Serialize to array"
+          "serToArr" ["this" -:: TypCls _dcName ] (TypArr TypAny) []
+          [ StmtMatch (ExprRaw "this.con")
+              ( [ (exprCon con , [ StmtRet $ exprClsSer con vs])
+                | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+                ]
+              , Just [StmtRet $ ExprRaw "[]"])
           ]
+      , defStatFunc "Serialize to binary"
+          "ser" ["this" -:: TypCls _dcName] (TypPrim PTByteArr) []
+          [StmtRet $ ExprRaw "var_to_bytes(serToArr(this))"]
       ]
-  , defStatFunc "Serialize to binary"
-      "ser" ["this" -:: TypCls _dcName] (TypPrim PTByteArr) []
-      [StmtRet $ ExprRaw "var_to_bytes(serToArr(this))"]
-  ]
 
 -- | gd expression that serializes class based on selected constructor
 exprClsSer :: String -> [DefVar] -> Expr Arr
@@ -83,7 +95,7 @@ exprClsSer con vs = ExprArr $ [ ExprElem $ exprCon con ] <> [ ExprElem $ exprVal
 
 -- | gd expression that serializes value
 exprValueSer vn typ = case typ of
-  TypCls _    -> ExprAny $ ExprRaw $ vn <> ".serToArr()"
+  TypCls (ClsName cn) -> ExprAny $ ExprRaw $ cn <> ".serToArr(this." <> vn <> ")"
   TypArr typ' -> ExprAny $ (vn <> ".map") --$ ["x" --> exprValueSer "x" typ']
   TypPair a b -> ExprAny $ ExprArr [ ExprElem $ exprValueSer (vn <> ".fst") a
                                    , ExprElem $  exprValueSer (vn <> ".snd") b
@@ -99,22 +111,26 @@ exprValueSer vn typ = case typ of
 --
 -- | Enrich DefCls with deserialization function compatible with godot-ser serialization
 addDeserialization :: DefCls -> DefCls
-addDeserialization dc@DefCls{..} = (`addDefFuncs` dc)
-  [ defStatFunc "Deserialize from array"
-      "desFromArr" [ "arr" -:: TypArr TypAny ] (TypCls _dcName) []
-      [ ("ret" -:: TypCls _dcName) -:= ExprRaw (cnName _dcName <> ".new()")
-      , ["ret", "con"] --= ExprRaw "arr[0]"
-      , StmtMatch (ExprRaw "ret.con")
-         [ (exprCon con, stmtsClsDes con vs)
-         | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
-         ]
-      , StmtRet (ExprRaw "ret")
-      ]
+addDeserialization dc@DefCls{..} =dc & dcInn . dciDefFuncs %~ (<> fs)
+                                     & dcInn . dciDefClasses %~ fmap addDeserialization
+  where
+    fs =
+     [ defStatFunc "Deserialize from array"
+          "desFromArr" [ "arr" -:: TypArr TypAny ] (TypCls _dcName) []
+          [ ("ret" -:: TypCls _dcName) -:= ExprRaw (cnName _dcName <> ".new()")
+          , ["ret", "con"] --= ExprRaw "arr[0]"
+          , StmtMatch (ExprRaw "ret.con")
+             ( [ (exprCon con, stmtsClsDes con vs)
+               | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
+               ]
+             , Nothing)
+          , StmtRet (ExprRaw "ret")
+          ]
 
-  , defStatFunc "Deserialize from binary"
-      "des" ["this" -:: TypPrim PTByteArr] (TypCls _dcName) []
-      [StmtRet $ ExprRaw "desFromArr(bytes_to_var(bs))"]
-  ]
+      , defStatFunc "Deserialize from binary"
+          "des" ["this" -:: TypPrim PTByteArr] (TypCls _dcName) []
+          [StmtRet $ ExprRaw "desFromArr(bytes_to_var(this))"]
+      ]
 
 -- | gd statements that deserialize class based on selected constructor
 stmtsClsDes :: p -> [DefVar] -> [Stmt]
@@ -129,7 +145,7 @@ ixVar s n = s <> ['_',chr $ ord 'A' + n]
 
 stmtsValueDes :: String -> String -> Int -> Typ -> [Stmt]
 stmtsValueDes nmIn nmOut i typ = case typ of
-  TypCls _    -> [ [nmOut] --= ExprAny (ExprRaw (nmIn <> ".desFromArr()")) ]
+  TypCls (ClsName nm) -> [ [nmOut] --= ExprAny (ExprRaw $ nm <> ".desFromArr(" <> nmIn <> ")") ]
   TypArr typ' -> [ StmtApp $ (nmOut <> ".assign") --$ [(nmIn <> ".map") --$ ["x" --> exprArrDes nmIn typ']]]
   TypDict a b -> [ ixVar "dict" i -:: TypDict a b -:= ExprRaw "{}"
                  , StmtVarInit (ixVar "k" i -:: a) Nothing
