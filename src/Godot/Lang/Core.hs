@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -323,3 +324,11 @@ addTypPairCls a b = dciDefClasses %~ (mkTypPairCls:)
     mkTypPairCls = DefCls (ClsName $ pairName (TypPair a b)) ExtendsObject
                      (emptyDefClsInn & addRecDefVar @"fst" a (EnumVal "P")
                                      & addRecDefVar @"snd" b (EnumVal "P"))
+
+-- | Check if type has multiple constructors
+isSumType :: DefCls -> Bool
+isSumType = (>1) . length . M.keys . _dciDefConVars . _dcInn
+
+-- | Check if it has single constructor and single variable (newtype or data)
+isNewtype :: DefCls -> Bool
+isNewtype = _dcInn >>> _dciDefConVars >>> toList >>> (\case [(_,[var])] -> True; _ -> False)

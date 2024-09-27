@@ -47,7 +47,7 @@ addCons dc@DefCls{..} = dc & dcInn . dciDefFuncs %~ (<> fs)
       [ defStatFunc ("Constructor function for sum constructor " <> con)
           (toLower <$> con) (join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName ) [] $
           [ ("ret" -:: TypCls _dcName) -:= ExprRaw (cnName _dcName <> ".new()")
-          , ["ret", "con"] --= exprCon con ] <>
+          ] <> [["ret", "con"] --= exprCon con  | isSumType dc] <>
           [ ["ret",  vn] --= ExprRaw vn | DefVar (VarName vn) _ <- vs ] <>
           [ StmtRet (ExprRaw "ret") ]
       | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
@@ -58,13 +58,19 @@ addConShow :: DefCls -> DefCls
 addConShow dc = dc & dcInn . dciDefFuncs %~ (<> [f])
                    & dcInn . dciDefClasses %~ fmap addConShow
   where
-    f = DefFunc False (Just "String representation of type") (FuncName "show") [] (TypPrim PTString) []
-      [ StmtMatch (ExprRaw "self.con")
-          ( [(exprCon con , [StmtRet $ ExprStr con])
-            | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc
-            ]
-          , Just [StmtRet $ ExprRaw "\"\""] )
-      ]
+    f = DefFunc False (Just "String representation of type") (FuncName "show") [] (TypPrim PTString) [] $
+      if isSumType dc
+      then
+        [ StmtMatch (ExprRaw "self.con")
+            ( [(exprCon con , [StmtRet $ ExprStr con])
+              | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc
+              ]
+            , Just [StmtRet $ ExprRaw "\"\""] )
+        ]
+      else
+        [StmtRet $ ExprStr con
+        | (EnumVal con,_) <- toList $ _dciDefConVars $ _dcInn dc
+        ]
 
 
 
@@ -78,28 +84,35 @@ addSerialization dc@DefCls{..} = dc & dcInn . dciDefFuncs %~ (<> fs)
     fs =
       [ defStatFunc "Serialize to array"
           "serToArr" ["this" -:: TypCls _dcName ] (TypArr TypAny) []
-          [ StmtMatch (ExprRaw "this.con")
-              ( [ (exprCon con , [ StmtRet $ exprClsSer con vs])
-                | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
-                ]
-              , Just [StmtRet $ ExprRaw "[]"])
-          ]
+          (if isSumType dc
+           then
+            [ StmtMatch (ExprRaw "this.con")
+                ( [ (exprCon con , [ StmtRet $ exprClsSer (Just con) vs])
+                  | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+                  ]
+                , Just [StmtRet $ ExprRaw "[]"])
+            ]
+           else
+            [ StmtRet $ exprClsSer Nothing vs
+            | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+            ]
+          )
+
       , defStatFunc "Serialize to binary"
           "ser" ["this" -:: TypCls _dcName] (TypPrim PTByteArr) []
           [StmtRet $ ExprRaw "var_to_bytes(serToArr(this))"]
       ]
 
--- | gd expression that serializes class based on selected constructor
-exprClsSer :: String -> [DefVar] -> Expr Arr
-exprClsSer con vs = ExprArr $ [ ExprElem $ exprCon con ] <> [ ExprElem $ exprValueSer vn typ | (DefVar (VarName vn) typ) <- vs ]
+-- | gd expression that serializes class based on selected constructor(optionally)
+exprClsSer :: Maybe String -> [DefVar] -> Expr Arr
+exprClsSer conMb vs = ExprArr $ maybe [] (pure . ExprElem . exprCon) conMb  <> [ ExprElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
 
 -- | gd expression that serializes value
 exprValueSer vn typ = case typ of
   TypCls (ClsName cn) -> ExprAny $ ExprRaw $ cn <> ".serToArr(this." <> vn <> ")"
   TypArr typ' -> ExprAny $ (vn <> ".map") --$ ["x" --> exprValueSer "x" typ']
-  TypPair a b -> ExprAny $ ExprArr [ ExprElem $ exprValueSer (vn <> ".fst") a
-                                   , ExprElem $  exprValueSer (vn <> ".snd") b
-                                   ]
+  TypPair a b -> ExprAny $ ExprRaw $ (showTyp (TypPair a b)) <> ".serToArr(" <>  vn <> ")"
+
   TypDict a b -> ExprAny $ (vn <> ".keys().map") --$ ["k" --> ExprArr [ ExprElem $ exprValueSer "k" a
                                                                       , ExprElem $  exprValueSer (vn <> "[k]") b
                                                                       ]
@@ -116,16 +129,23 @@ addDeserialization dc@DefCls{..} =dc & dcInn . dciDefFuncs %~ (<> fs)
   where
     fs =
      [ defStatFunc "Deserialize from array"
-          "desFromArr" [ "arr" -:: TypArr TypAny ] (TypCls _dcName) []
+          "desFromArr" [ "arr" -:: TypArr TypAny ] (TypCls _dcName) [] $
           [ ("ret" -:: TypCls _dcName) -:= ExprRaw (cnName _dcName <> ".new()")
-          , ["ret", "con"] --= ExprRaw "arr[0]"
-          , StmtMatch (ExprRaw "ret.con")
-             ( [ (exprCon con, stmtsClsDes con vs)
-               | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
-               ]
-             , Nothing)
-          , StmtRet (ExprRaw "ret")
-          ]
+          ] <> [["ret", "con"] --= ExprRaw "arr[0]" | isSumType dc] <>
+          ( if isSumType dc
+            then
+              [ StmtMatch (ExprRaw "ret.con")
+                 ( [ (exprCon con, stmtsClsDes 1 con vs)
+                   | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
+                   ]
+                 , Nothing)
+              ]
+              else
+              concat [ stmtsClsDes 0 con vs
+              | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
+              ]
+          ) <> [ StmtRet (ExprRaw "ret") ]
+
 
       , defStatFunc "Deserialize from binary"
           "des" ["this" -:: TypPrim PTByteArr] (TypCls _dcName) []
@@ -133,11 +153,11 @@ addDeserialization dc@DefCls{..} =dc & dcInn . dciDefFuncs %~ (<> fs)
       ]
 
 -- | gd statements that deserialize class based on selected constructor
-stmtsClsDes :: p -> [DefVar] -> [Stmt]
-stmtsClsDes con vs = concat
+stmtsClsDes :: Int -> p -> [DefVar] -> [Stmt]
+stmtsClsDes start con vs = concat
   [  stmtsValueDes ("arr[" <> show i <> "]") ("ret." <> vn) 0 typ
   -- <> [["ret", vn] --= ExprRaw vn]
-  | (i, DefVar (VarName vn) typ) <- zip [1..] vs
+  | (i, DefVar (VarName vn) typ) <- zip [start..] vs
   ]
 
 ixVar :: String -> Int -> String
