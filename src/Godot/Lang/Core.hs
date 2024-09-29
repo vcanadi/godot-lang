@@ -193,12 +193,15 @@ data DefFunc = DefFunc
 deriving instance Show DefFunc
 
 -- | Combinator for easier DefFunc construction
-defFunc :: String -> String -> [DefVar] -> Typ -> [DefVar] -> [Stmt] -> DefFunc
-defFunc comm fn = DefFunc False (Just comm) (FuncName fn)
+func :: String -> [DefVar] -> Typ -> [Stmt] -> DefFunc
+func fn args typ stmts = DefFunc False Nothing (FuncName fn) args typ [] stmts
 
 -- | Combinator for easier static DefFunc construction
-defStatFunc :: String -> String -> [DefVar] -> Typ -> [DefVar] -> [Stmt] -> DefFunc
-defStatFunc comm fn = DefFunc True (Just comm) (FuncName fn)
+stat_func :: String -> [DefVar] -> Typ -> [Stmt] -> DefFunc
+stat_func fn args typ stmts = DefFunc True Nothing (FuncName fn) args typ [] stmts
+
+(###) :: String -> DefFunc -> DefFunc
+comment ### func = func { _dfComment = Just comment }
 
 data Stmt where
   StmtApp :: Expr App -> Stmt
@@ -324,6 +327,12 @@ addTypPairCls a b = dciDefClasses %~ (mkTypPairCls:)
     mkTypPairCls = DefCls (ClsName $ pairName (TypPair a b)) ExtendsObject
                      (emptyDefClsInn & addRecDefVar @"fst" a (EnumVal "P")
                                      & addRecDefVar @"snd" b (EnumVal "P"))
+
+-- | Add functions to the class and every class defined within
+addFuncsRecursive :: DefCls -> [DefFunc] -> DefCls
+addFuncsRecursive dc fs = (dcInn . dciDefFuncs %~ (<> fs))
+                        $ (dcInn . dciDefClasses %~ fmap (`addFuncsRecursive` fs))
+                        dc
 
 -- | Check if type has multiple constructors
 isSumType :: DefCls -> Bool

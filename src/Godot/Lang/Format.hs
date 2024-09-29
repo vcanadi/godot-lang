@@ -122,7 +122,7 @@ fmtExpr (ExprStr s) = [i|"#{s}"|]
 fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExprElem <$> es)} ] |]
 fmtExpr (ExprRaw s) = s
 fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> intercalate ", " (fmtExpr <$> args) <> ")"
-fmtExpr (ExprLam (VarName vn) e) = "func(" <> vn <> "): " <> fmtExpr e
+fmtExpr (ExprLam (VarName vn) e) = "func(" <> vn <> "): return " <> fmtExpr e
 fmtExpr (ExprAny e) = fmtExpr e
 
 fmtArgs :: [DefVar] -> String

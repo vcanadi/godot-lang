@@ -5,6 +5,11 @@ class SrvMsg extends Object:
     var fst: SockAddr
     var snd: Pos
   
+    # String representation of type
+    func show() -> String:
+      return P 
+    
+    
     # Constructor function for sum constructor P
     static func p(fst: SockAddr, snd: Pos) -> P_SockAddr_Pos_P:
       var ret: P_SockAddr_Pos_P = P_SockAddr_Pos_P.new() 
@@ -15,7 +20,7 @@ class SrvMsg extends Object:
     
     # String representation of type
     func show() -> String:
-      return "P" 
+      return P 
     
     
     # Deserialize from array
@@ -26,22 +31,16 @@ class SrvMsg extends Object:
       return ret 
     
     
-    # Deserialize from binary
-    static func des(this: PackedByteArray) -> P_SockAddr_Pos_P:
-      return desFromArr(bytes_to_var(this)) 
-    
-    
     # Serialize to array
     static func serToArr(this: P_SockAddr_Pos_P) -> Array[Variant]:
-      return  [ SockAddr.serToArr(this.this.fst), Pos.serToArr(this.this.snd) ]  
-    
-    
-    # Serialize to binary
-    static func ser(this: P_SockAddr_Pos_P) -> PackedByteArray:
-      return var_to_bytes(serToArr(this)) 
+      return  [ SockAddr.serToArr(this.fst), Pos.serToArr(this.snd) ]  
 
   var model: Array[P_SockAddr_Pos_P]
 
+  #  Equality check of two SrvMsg 
+  static func eq(a: SrvMsg, b: SrvMsg) -> bool:
+  
+  
   # Constructor function for sum constructor PUT_STATE
   static func put_state(model: Array[P_SockAddr_Pos_P]) -> SrvMsg:
     var ret: SrvMsg = SrvMsg.new() 
@@ -51,26 +50,16 @@ class SrvMsg extends Object:
   
   # String representation of type
   func show() -> String:
-    return "PUT_STATE" 
+    return PUT_STATE 
   
   
   # Deserialize from array
   static func desFromArr(arr: Array[Variant]) -> SrvMsg:
     var ret: SrvMsg = SrvMsg.new() 
-    ret.model.assign(arr[0].map(func(x): [arr[0][0], arr[0][1]]))
+    ret.model.assign(arr.map(func(x): return P_SockAddr_Pos_P.desFromArr(x)))
     return ret 
-  
-  
-  # Deserialize from binary
-  static func des(this: PackedByteArray) -> SrvMsg:
-    return desFromArr(bytes_to_var(this)) 
   
   
   # Serialize to array
   static func serToArr(this: SrvMsg) -> Array[Variant]:
-    return  [ this.model.map(func(x): P_SockAddr_Pos_P.serToArr(x)) ]  
-  
-  
-  # Serialize to binary
-  static func ser(this: SrvMsg) -> PackedByteArray:
-    return var_to_bytes(serToArr(this)) 
+    return this.model.map(func(x): return P_SockAddr_Pos_P.serToArr(x)) 

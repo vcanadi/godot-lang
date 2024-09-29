@@ -30,7 +30,7 @@ data SockAddr
         String           -- sun_path
   deriving (Eq, Ord, Show, Generic)
 
-newtype SrvMsg = PUT_STATE { model :: Model }
+data SrvMsg = PUT_STATE { model :: Model }
   deriving (Show, Eq, Generic)
 
 
