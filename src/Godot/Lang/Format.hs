@@ -86,15 +86,15 @@ fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp vars stmts)
 #{addIndent $ breakLines $ fmtStmt <$> stmts}|]
 
 fmtStmt (StmtApp e) = fmtExpr e
-fmtStmt (StmtIf e s) = [i|if #{fmtBoolExpr e}: #{fmtStmt s} |]
-fmtStmt (StmtIfElse e s s') = [i|if #{fmtBoolExpr e}: #{fmtStmt s} else: #{fmtStmt s} |]
+fmtStmt (StmtIf e s) = [i|if #{fmtExpr e}: #{fmtStmt s} |]
+fmtStmt (StmtIfElse e s s') = [i|if #{fmtExpr e}: #{fmtStmt s} else: #{fmtStmt s} |]
 fmtStmt (StmtFor v l s) = [i|
-for #{fmtVarName v} in #{fmtRangeExpr l}:
+for #{fmtVarName v} in #{fmtExpr l}:
 #{addIndent $ unlines $ fmtStmt <$> s} |]
 fmtStmt (StmtMatch e (css, othMb))
-  = (<>) [i|match #{fmtExpr e}:|] $ addIndent $ (`concatMap` css) $ \(e',ss) -> "\n" <>
-    [i|#{fmtExpr e'}:\n#{unlines (addIndent . fmtStmt  <$> ss)}|] <>
-    maybe "" (\oth -> [i|_:\n#{unlines (addIndent . fmtStmt <$> oth)}|]) othMb
+  = [i|match #{fmtExpr e}:
+|] <> addIndent (concatMap (\(e',ss) -> [i|#{fmtExpr e'}: #{unlines (addIndent . fmtStmt  <$> ss)}|]) css)
+   <> addIndent (maybe "" (\oth -> [i|_:#{unlines (addIndent . fmtStmt <$> oth)}|]) othMb)
 
 
 fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
@@ -102,28 +102,24 @@ fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
 fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
 fmtStmt (StmtSet (Iden id') e) = [i|#{intercalate "." id'} = #{fmtExpr e}|]
 
-fmtBoolExpr :: Expr Bool -> String
-fmtBoolExpr ExprTrue = "true"
-fmtBoolExpr ExprFalse = "False"
-
-fmtRangeExpr :: Expr Enumerable -> String
-fmtRangeExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
-fmtRangeExpr (ExprRangeVar (VarName v)) = [i|#{v}|]
-
 fmtExprElem :: ExprElem -> String
 fmtExprElem (ExprElem e) = fmtExpr e
 
 fmtExpr :: Expr t -> String
 fmtExpr ExprTrue = "true"
 fmtExpr ExprFalse = "False"
+fmtExpr (ExprNot e) = "!(" <> fmtExpr e <> ")"
+fmtExpr (ExprEq e0 e1) = fmtExpr e0  <> "==" <> fmtExpr e1
+fmtExpr (ExprAnd es) = intercalate " && " $ fmap fmtExpr es
+fmtExpr (ExprOr es) = intercalate " || " $ fmap fmtExpr es
 fmtExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
 fmtExpr (ExprRangeVar v) = fmtVarName v
 fmtExpr (ExprStr s) = [i|"#{s}"|]
-fmtExpr (ExprArr es) = [i| [ #{intercalate ", " (fmtExprElem <$> es)} ] |]
+fmtExpr (ExprArr es) = [i|[ #{intercalate ", " (fmtExprElem <$> es)} ] |]
+fmtExpr (ExprAt n e) = [i|#{fmtExpr e}[#{n}]|]
 fmtExpr (ExprRaw s) = s
 fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> intercalate ", " (fmtExpr <$> args) <> ")"
-fmtExpr (ExprLam (VarName vn) e) = "func(" <> vn <> "): return " <> fmtExpr e
-fmtExpr (ExprAny e) = fmtExpr e
+fmtExpr (ExprLam vs e) = "func(" <> intercalate "," ((\(VarName vn) -> vn) <$> vs) <> "): return " <> fmtExpr e
 
 fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtVar <$> args

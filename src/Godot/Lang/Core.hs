@@ -174,10 +174,6 @@ data DefVar = DefVar
   } deriving (Eq,Show)
 
 -- | Easier DefVar construction
-(-::) :: String -> Typ -> DefVar
-(-::) = DefVar . VarName
-
--- | Easier DefVar construction
 defVar' :: forall typ. (ToTyp typ) => String -> DefVar
 defVar' vn = DefVar (VarName vn) (toTyp @typ)
 
@@ -194,11 +190,11 @@ deriving instance Show DefFunc
 
 -- | Combinator for easier DefFunc construction
 func :: String -> [DefVar] -> Typ -> [Stmt] -> DefFunc
-func fn args typ stmts = DefFunc False Nothing (FuncName fn) args typ [] stmts
+func fn args typ = DefFunc False Nothing (FuncName fn) args typ []
 
 -- | Combinator for easier static DefFunc construction
 stat_func :: String -> [DefVar] -> Typ -> [Stmt] -> DefFunc
-stat_func fn args typ stmts = DefFunc True Nothing (FuncName fn) args typ [] stmts
+stat_func fn args typ = DefFunc True Nothing (FuncName fn) args typ []
 
 (###) :: String -> DefFunc -> DefFunc
 comment ### func = func { _dfComment = Just comment }
@@ -213,16 +209,6 @@ data Stmt where
   StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
   StmtSet :: Iden -> Expr t -> Stmt
 deriving instance Show Stmt
-
--- Combinators for building statements
-
--- | Var initialization statement helper
-(-:=) :: DefVar -> Expr t -> Stmt
-(-:=) dv val = StmtVarInit dv $ Just val
-
--- | Set statement helper
-(--=) :: [String] -> Expr t -> Stmt
-(--=) ids  = StmtSet (Iden ids)
 
 -- | Type used for flaging godot expression acceptable for for loop
 data Enumerable = Enumerable
@@ -243,23 +229,27 @@ data Lam = Lam
 data App = App
 
 data ExprElem = forall t. ExprElem { eeElem :: Expr t }
-data ExprAny = ExprAnyCons
 deriving instance Show ExprElem
 
 data Expr t where
   ExprFalse :: Expr Bool
   ExprTrue :: Expr Bool
+  ExprEq :: Expr t -> Expr t' -> Expr Bool
+  ExprOr :: [Expr Bool] -> Expr Bool
+  ExprAnd :: [Expr Bool] -> Expr Bool
+  ExprNot :: Expr Bool -> Expr Bool
   ExprRange :: Int -> Int -> Int -> Expr Enumerable
   ExprRangeVar :: VarName -> Expr Enumerable
   ExprStr :: String -> Expr Str
   ExprArr :: [ExprElem] -> Expr Arr
-  ExprLam :: VarName -> Expr t -> Expr Lam
-  ExprApp :: FuncName -> [Expr t] -> Expr App
-  ExprRaw :: String -> Expr Raw
-  ExprAny :: Expr t -> Expr ExprAny -- ^ Wrap any expression in opaque type
+  ExprAt  :: Int -> Expr t -> Expr t'
+  ExprLam :: [VarName] -> Expr t -> Expr Lam
+  ExprApp :: FuncName -> [Expr t] -> Expr t'
+  ExprRaw :: String -> Expr t
+  ExprId :: [String] -> Expr t
 deriving instance Show (Expr t)
 
-(-->) vn = ExprLam (VarName vn)
+(-->) vn = ExprLam [VarName vn]
 (--$) fn = ExprApp (FuncName fn)
 
 -- | Main type describing godot class, inner information about class
@@ -329,9 +319,9 @@ addTypPairCls a b = dciDefClasses %~ (mkTypPairCls:)
                                      & addRecDefVar @"snd" b (EnumVal "P"))
 
 -- | Add functions to the class and every class defined within
-addFuncsRecursive :: DefCls -> [DefFunc] -> DefCls
-addFuncsRecursive dc fs = (dcInn . dciDefFuncs %~ (<> fs))
-                        $ (dcInn . dciDefClasses %~ fmap (`addFuncsRecursive` fs))
+addFuncsRecursive :: (DefCls -> [DefFunc]) -> DefCls -> DefCls
+addFuncsRecursive mkFs dc = (dcInn . dciDefFuncs %~ (<> mkFs dc))
+                        $ (dcInn . dciDefClasses %~ fmap (addFuncsRecursive mkFs))
                         dc
 
 -- | Check if type has multiple constructors
@@ -341,3 +331,21 @@ isSumType = (>1) . length . M.keys . _dciDefConVars . _dcInn
 -- | Check if it has single constructor and single variable (newtype or data)
 isNewtype :: DefCls -> Bool
 isNewtype = _dcInn >>> _dciDefConVars >>> toList >>> (\case [(_,[var])] -> True; _ -> False)
+
+-- Combinators for building statements and expressions
+
+-- | Var initialization statement helper
+(-:=) :: DefVar -> Expr t -> Stmt
+(-:=) dv val = StmtVarInit dv $ Just val
+
+-- | Set statement helper
+(--=) :: [String] -> Expr t -> Stmt
+(--=) ids  = StmtSet (Iden ids)
+
+-- | Easier DefVar construction
+(-::) :: String -> Typ -> DefVar
+(-::) = DefVar . VarName
+
+-- | Equality check
+(-==) :: Expr t -> Expr t' -> Expr Bool
+a -== b = ExprEq a b
