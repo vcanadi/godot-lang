@@ -228,29 +228,29 @@ data Lam = Lam
 -- | Type used for flaging godot function application expression
 data App = App
 
-data ExprElem = forall t. ExprElem { eeElem :: Expr t }
+data ExprElem = forall t. EElem { eeElem :: Expr t }
 deriving instance Show ExprElem
 
 data Expr t where
-  ExprFalse :: Expr Bool
-  ExprTrue :: Expr Bool
-  ExprEq :: Expr t -> Expr t' -> Expr Bool
-  ExprOr :: [Expr Bool] -> Expr Bool
-  ExprAnd :: [Expr Bool] -> Expr Bool
-  ExprNot :: Expr Bool -> Expr Bool
-  ExprRange :: Int -> Int -> Int -> Expr Enumerable
-  ExprRangeVar :: VarName -> Expr Enumerable
-  ExprStr :: String -> Expr Str
-  ExprArr :: [ExprElem] -> Expr Arr
-  ExprAt  :: Int -> Expr t -> Expr t'
-  ExprLam :: [VarName] -> Expr t -> Expr Lam
-  ExprApp :: FuncName -> [Expr t] -> Expr t'
-  ExprRaw :: String -> Expr t
-  ExprId :: [String] -> Expr t
+  EFalse :: Expr Bool
+  ETrue :: Expr Bool
+  EEq :: Expr t -> Expr t' -> Expr Bool
+  EOr :: [Expr Bool] -> Expr Bool
+  EAnd :: [Expr Bool] -> Expr Bool
+  ENot :: Expr Bool -> Expr Bool
+  ERange :: Int -> Int -> Int -> Expr Enumerable
+  ERangeVar :: VarName -> Expr Enumerable
+  EStr :: String -> Expr Str
+  EArr :: [ExprElem] -> Expr Arr
+  EAt  :: Int -> Expr t -> Expr t'
+  ELam :: [VarName] -> Expr t -> Expr Lam
+  EApp :: FuncName -> [Expr t] -> Expr t'
+  ERaw :: String -> Expr t
+  EId :: [String] -> Expr t
 deriving instance Show (Expr t)
 
-(-->) vn = ExprLam [VarName vn]
-(--$) fn = ExprApp (FuncName fn)
+(-->) vn = ELam [VarName vn]
+(--$) fn = EApp (FuncName fn)
 
 -- | Main type describing godot class, inner information about class
 data DefClsInn = DefClsInn
@@ -348,4 +348,4 @@ isNewtype = _dcInn >>> _dciDefConVars >>> toList >>> (\case [(_,[var])] -> True;
 
 -- | Equality check
 (-==) :: Expr t -> Expr t' -> Expr Bool
-a -== b = ExprEq a b
+a -== b = EEq a b

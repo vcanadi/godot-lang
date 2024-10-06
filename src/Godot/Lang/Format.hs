@@ -103,23 +103,23 @@ fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
 fmtStmt (StmtSet (Iden id') e) = [i|#{intercalate "." id'} = #{fmtExpr e}|]
 
 fmtExprElem :: ExprElem -> String
-fmtExprElem (ExprElem e) = fmtExpr e
+fmtExprElem (EElem e) = fmtExpr e
 
 fmtExpr :: Expr t -> String
-fmtExpr ExprTrue = "true"
-fmtExpr ExprFalse = "False"
-fmtExpr (ExprNot e) = "!(" <> fmtExpr e <> ")"
-fmtExpr (ExprEq e0 e1) = fmtExpr e0  <> "==" <> fmtExpr e1
-fmtExpr (ExprAnd es) = intercalate " && " $ fmap fmtExpr es
-fmtExpr (ExprOr es) = intercalate " || " $ fmap fmtExpr es
-fmtExpr (ExprRange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
-fmtExpr (ExprRangeVar v) = fmtVarName v
-fmtExpr (ExprStr s) = [i|"#{s}"|]
-fmtExpr (ExprArr es) = [i|[ #{intercalate ", " (fmtExprElem <$> es)} ] |]
-fmtExpr (ExprAt n e) = [i|#{fmtExpr e}[#{n}]|]
-fmtExpr (ExprRaw s) = s
-fmtExpr (ExprApp (FuncName fn) args) = fn <> "(" <> intercalate ", " (fmtExpr <$> args) <> ")"
-fmtExpr (ExprLam vs e) = "func(" <> intercalate "," ((\(VarName vn) -> vn) <$> vs) <> "): return " <> fmtExpr e
+fmtExpr ETrue = "true"
+fmtExpr EFalse = "False"
+fmtExpr (ENot e) = "!(" <> fmtExpr e <> ")"
+fmtExpr (EEq e0 e1) = fmtExpr e0  <> "==" <> fmtExpr e1
+fmtExpr (EAnd es) = intercalate " && " $ fmap fmtExpr es
+fmtExpr (EOr es) = intercalate " || " $ fmap fmtExpr es
+fmtExpr (ERange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
+fmtExpr (ERangeVar v) = fmtVarName v
+fmtExpr (EStr s) = [i|"#{s}"|]
+fmtExpr (EArr es) = [i|[ #{intercalate ", " (fmtExprElem <$> es)} ] |]
+fmtExpr (EAt n e) = [i|#{fmtExpr e}[#{n}]|]
+fmtExpr (ERaw s) = s
+fmtExpr (EApp (FuncName fn) args) = fn <> "(" <> intercalate ", " (fmtExpr <$> args) <> ")"
+fmtExpr (ELam vs e) = "func(" <> intercalate "," ((\(VarName vn) -> vn) <$> vs) <> "): return " <> fmtExpr e
 
 fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtVar <$> args
