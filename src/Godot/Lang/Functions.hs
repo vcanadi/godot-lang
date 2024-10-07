@@ -32,7 +32,6 @@ import Control.Monad (join)
 import Godot.Lang.Core
 import Data.String.Interpolate (i)
 
-exprCon con = ERaw $ "Con." <> con
 
 -- perTypDefFunc dc comm fn args retTyp =
 --   comm ###
@@ -40,7 +39,7 @@ exprCon con = ERaw $ "Con." <> con
 --   where
 --     sumTypeMatch =
 --         [ StmtMatch (ERaw "self.con")
---             ( [(exprCon con , [StmtRet $ EStr con])
+--             ( [(eCon con , [StmtRet $ EStr con])
 --               | (EnumVal con,_) <- toList $ _dciDefConVars _dcInn
 --               ]
 --             , Just [StmtRet $ ERaw "\"\""] )
@@ -65,7 +64,7 @@ addCons dc@DefCls{..} =
   [ [i|Constructor function for sum constructor #{con}|] ###
     stat_func (toLower <$> con) (join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName )
       ( [ ("ret" -:: TypCls _dcName) -:= ERaw (cnName _dcName <> ".new()") ] <>
-        [ ["ret", "con"] --= exprCon con  | isSumType dc] <>
+        [ ["ret", "con"] --= eCon con  | isSumType dc] <>
         [ ["ret",  vn] --= ERaw vn
           | DefVar (VarName vn) _ <- vs
         ] <>
@@ -84,7 +83,7 @@ addConShow dc@DefCls{..} =
   where
     sumTypeMatch =
         [ StmtMatch (ERaw "self.con")
-            ( [(exprCon con , [StmtRet $ EStr con])
+            ( [(eCon con , [StmtRet $ EStr con])
               | (EnumVal con,_) <- toList $ _dciDefConVars _dcInn
               ]
             , Just [StmtRet $ EStr ""] )
@@ -100,25 +99,23 @@ addEq :: DefCls -> [DefFunc]
 addEq dc@DefCls{..} =
   [ [i| Equality check of two #{cnName _dcName} |] ###
     stat_func "eq" ["a" -:: TypCls _dcName, "b" -:: TypCls _dcName] (TypPrim PTBool)
-      (if isSumType dc then sumTypeMatch else prodTypeCase)
+      (if isSumType dc then sumTypeCase else prodTypeCase)
 
   , [i| Non-static equality check of two #{cnName _dcName} |] ###
     func "eq1" ["b" -:: TypCls _dcName] (TypPrim PTBool) [StmtRet $ ERaw $ cnName _dcName <> ".eq(self, b)"]
   ]
   where
-    sumTypeMatch =
-      [ StmtIf (ENot $ EId ["a","con"] -== EId ["b","con"]) (StmtRet EFalse)
-        , StmtMatch (EId ["a", "con"])
-            ( [(exprCon con , [ StmtRet $ exprClsEq vs])
-              | (EnumVal con,vs) <- toList $ _dciDefConVars _dcInn
-              ]
-            , Just [StmtRet EFalse]
-            )
-        ]
+    sumTypeCase =
+      [ StmtRet $
+         eId ["a","con"] -== eId ["b","con"]
+         -&& EOr [ (eId ["a", "con"] -== eCon con) -&& exprClsEq vs
+                 | (EnumVal con,vs) <- toList $ _dciDefConVars _dcInn
+                 ]
+      ]
     prodTypeCase =
-        [ StmtRet $ exprClsEq vs
-        | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
-        ]
+      [ StmtRet $ exprClsEq vs
+      | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+      ]
 
     -- | gd expression that tests equality based on selected constructor(optionally)
     exprClsEq :: [DefVar] -> Expr Bool
@@ -131,11 +128,11 @@ addEq dc@DefCls{..} =
       TypCls (ClsName cn) -> ERaw $ cn <> ".eq(" <> aVn <> ", " <> bVn <> ")"
       TypArr typ' -> EAt 0 ((aVn <> ".reduce") --$ [ELam [VarName "acc", VarName "x"] $ EArr [EElem $ EAnd [ERaw "acc[0]" , exprValueEq "x" (bVn <> "[acc[1]]") typ'], EElem $ ERaw "acc[1] + 1"], ERaw "[true, 0]"  ])
       TypPair a b -> ERaw $ showTyp (TypPair a b) <> ".eq(" <> aVn <> ", " <> bVn <> ")"
-
+      -- TODO
       -- TypDict a b -> (aVn <> ".keys().map") --$ ["k" --> EArr [ EElem $ exprValueEq "k" a
       --                                                                     , EElem $  exprValueEq (vn <> "[k]") b
       --                                                                     ]
-                                                         -- ]
+      --                                                    ]
       _     -> EEq (ERaw aVn) (ERaw bVn)
 
 -- Serializing expressions
@@ -150,7 +147,7 @@ addSerToArr dc@DefCls{..} =
   where
     sumTypeMatch =
       [ StmtMatch (ERaw "this.con")
-          ( [ (exprCon con , [ StmtRet $ exprClsSer (Just con) vs])
+          ( [ (eCon con , [ StmtRet $ exprClsSer (Just con) vs])
             | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
             ]
           , Just [StmtRet $ ERaw "[]"])
@@ -169,7 +166,7 @@ addSerToArr dc@DefCls{..} =
         -- | Multiple product arguments
         _                         -> EArr [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
       -- | Existing constructor (sum type)
-      Just con -> EArr $ [EElem $ exprCon con] <> [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
+      Just con -> EArr $ [EElem $ eCon con] <> [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
 
 
 
@@ -202,7 +199,7 @@ addDesFromArr dc@DefCls{..} =
     sumTypeMatch =
       [["ret", "con"] --= ERaw "arr[0]"
       , StmtMatch (ERaw "ret.con")
-         ( [ (exprCon con, stmtsClsDes 1 con vs)
+         ( [ (eCon con, stmtsClsDes 1 con vs)
            | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
            ]
          , Nothing)

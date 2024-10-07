@@ -111,7 +111,7 @@ fmtExpr EFalse = "False"
 fmtExpr (ENot e) = "!(" <> fmtExpr e <> ")"
 fmtExpr (EEq e0 e1) = fmtExpr e0  <> "==" <> fmtExpr e1
 fmtExpr (EAnd es) = intercalate " && " $ fmap fmtExpr es
-fmtExpr (EOr es) = intercalate " || " $ fmap fmtExpr es
+fmtExpr (EOr es) = "(" <> intercalate " || " (fmap fmtExpr es) <> ")"
 fmtExpr (ERange s e d) = [i|range(#{show s}, #{show e}, #{show d})|]
 fmtExpr (ERangeVar v) = fmtVarName v
 fmtExpr (EStr s) = [i|"#{s}"|]
@@ -120,6 +120,7 @@ fmtExpr (EAt n e) = [i|#{fmtExpr e}[#{n}]|]
 fmtExpr (ERaw s) = s
 fmtExpr (EApp (FuncName fn) args) = fn <> "(" <> intercalate ", " (fmtExpr <$> args) <> ")"
 fmtExpr (ELam vs e) = "func(" <> intercalate "," ((\(VarName vn) -> vn) <$> vs) <> "): return " <> fmtExpr e
+fmtExpr (EId (Iden is)) = intercalate "." is
 
 fmtArgs :: [DefVar] -> String
 fmtArgs args = intercalate ", "  $ fmtVar <$> args

@@ -246,7 +246,7 @@ data Expr t where
   ELam :: [VarName] -> Expr t -> Expr Lam
   EApp :: FuncName -> [Expr t] -> Expr t'
   ERaw :: String -> Expr t
-  EId :: [String] -> Expr t
+  EId :: Iden -> Expr t -- ^ Identifier
 deriving instance Show (Expr t)
 
 (-->) vn = ELam [VarName vn]
@@ -334,6 +334,8 @@ isNewtype = _dcInn >>> _dciDefConVars >>> toList >>> (\case [(_,[var])] -> True;
 
 -- Combinators for building statements and expressions
 
+-- Assignments
+--
 -- | Var initialization statement helper
 (-:=) :: DefVar -> Expr t -> Stmt
 (-:=) dv val = StmtVarInit dv $ Just val
@@ -346,6 +348,24 @@ isNewtype = _dcInn >>> _dciDefConVars >>> toList >>> (\case [(_,[var])] -> True;
 (-::) :: String -> Typ -> DefVar
 (-::) = DefVar . VarName
 
+-- Binary operators
+--
 -- | Equality check
 (-==) :: Expr t -> Expr t' -> Expr Bool
 a -== b = EEq a b
+
+(-&&) :: Expr Bool -> Expr Bool -> Expr Bool
+a -&& (EAnd bs) = EAnd $ a:bs
+(EAnd as) -&& b = EAnd $ as <> [b]
+a -&& b = EAnd [a, b]
+
+(-||) :: Expr Bool -> Expr Bool -> Expr Bool
+a -|| (EOr bs) = EOr $ a:bs
+(EOr as) -|| b = EOr $ as <> [b]
+a -|| b = EOr [a, b]
+
+
+-- | Shortcut for some constructor constant "Con.<con>: Con"
+eCon con = EId $ Iden ["Con",con]
+
+eId is = EId $ Iden is
