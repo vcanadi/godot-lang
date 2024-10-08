@@ -27,13 +27,13 @@ import Godot.Lang.Kind.General
 import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
 import Control.Lens.TH(makeLenses)
 import Control.Lens
-import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
+import Data.Map.Strict (Map, insertWith, fromList, toList)
 import qualified Data.Map.Strict as M
 import Control.Arrow ((>>>))
 import Data.String.Interpolate (i)
-import Data.List (intercalate)
+import Data.List (intercalate, find)
 import Data.Char (toLower)
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, isNothing)
 import Control.Monad (join)
 
 class ToTyp t where
@@ -257,7 +257,7 @@ data DefClsInn = DefClsInn
   { _dciDefEnums :: Map String [EnumVal] -- ^ Local class enums
   , _dciDefClasses :: [DefCls]
   , _dciDefConsts :: [DefVar]
-  , _dciDefConVars :: Map EnumVal [DefVar] -- ^ Unique enum "Con" with optional variables belonging to it
+  , _dciDefConVars :: [(EnumVal, [DefVar])] -- ^ Unique enum "Con" with optional variables belonging to it
   , _dciDefVars :: [DefVar]
   , _dciDefFuncs :: [DefFunc]
   } deriving Show
@@ -272,6 +272,16 @@ data DefCls = DefCls
 $(makeLenses ''DefClsInn)
 $(makeLenses ''DefCls)
 
+-- | Helper function. Like unionWith on Map k v, but for [(k,v)]
+unionWithL :: (Eq k) => (v -> v -> v) -> [(k, v)] -> [(k, v)] -> [(k, v)]
+unionWithL f xs ys = [ find (fst >>> (==xk)) ys  & \case Nothing -> (xk, xv); Just (_, yv) -> (xk, f xv yv)
+                    | (xk, xv) <- xs]
+                 <> [ (yk, yv)
+                    | (yk, yv) <- ys, isNothing $ find (fst >>> (==yk)) xs]
+
+insertWithL :: (Eq k) => (v -> v -> v) -> k -> v -> [(k,v)] -> [(k,v)]
+insertWithL f k v xs = unionWithL f xs [(k,v)]
+
 -- Combinators for building DefCls
 
 -- | Godot's class definition without any functions, enums, variables,...
@@ -282,10 +292,10 @@ emptyDefClsInn  = DefClsInn mempty [] [] mempty [] []
 joinDefClsInn :: DefClsInn -> DefClsInn -> DefClsInn
 joinDefClsInn dci0 dci1 =
   DefClsInn
-    (unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1))
+    (M.unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1))
     (_dciDefClasses dci0 <> _dciDefClasses dci1)
     (_dciDefConsts dci0 <> _dciDefConsts dci1)
-    (unionWith (<>) (_dciDefConVars dci0) (_dciDefConVars dci1))
+    (unionWithL (<>) (_dciDefConVars dci0) (_dciDefConVars dci1))
     (_dciDefVars dci0 <> _dciDefVars dci1)
     (_dciDefFuncs dci0 <> _dciDefFuncs dci1)
 
@@ -298,17 +308,17 @@ addToEnum k v = dciDefEnums %~ insertWith (flip (<>)) k [EnumVal v]
 
 -- | Add a value to unique "Con" enum representing sum type's constructor flag
 addToConEnum :: String -> DefClsInn -> DefClsInn
-addToConEnum v = dciDefConVars %~ M.insert (EnumVal v) []
+addToConEnum v = dciDefConVars %~ (<> [(EnumVal v, [])])
 
 -- | Add a variable definition that holds some sum type constructor's record value
 -- Additionally construct class inner type in case that is wanted (e.g. if type is a TypPair (helper type collection mimicing type variables))
 addRecDefVar :: forall fld typ. (KnownSymbol fld) => Typ -> EnumVal -> DefClsInn -> DefClsInn
-addRecDefVar typ con = (dciDefConVars %~ insertWith (flip (<>)) con [symbolVal (Proxy @fld) -:: typ ])
+addRecDefVar typ con = (dciDefConVars %~ insertWithL (flip (<>)) con [symbolVal (Proxy @fld) -:: typ ])
                      . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
 
 -- | Add a variable definition that holds some sum type constructor's unnamed value
 addConDefVar :: Int -> Typ -> EnumVal -> DefClsInn -> DefClsInn
-addConDefVar i typ con = (dciDefConVars %~ insertWith (flip (<>)) con [("fld_" <> evVal con <> "_" <> show i) -:: typ])
+addConDefVar i typ con = (dciDefConVars %~ insertWithL (flip (<>)) con [("fld_" <> evVal con <> "_" <> show i) -:: typ])
                        . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
 
 addTypPairCls :: Typ -> Typ -> DefClsInn -> DefClsInn
@@ -326,11 +336,11 @@ addFuncsRecursive mkFs dc = (dcInn . dciDefFuncs %~ (<> mkFs dc))
 
 -- | Check if type has multiple constructors
 isSumType :: DefCls -> Bool
-isSumType = (>1) . length . M.keys . _dciDefConVars . _dcInn
+isSumType = (>1) . length . fmap fst . _dciDefConVars . _dcInn
 
 -- | Check if it has single constructor and single variable (newtype or data)
 isNewtype :: DefCls -> Bool
-isNewtype = _dcInn >>> _dciDefConVars >>> toList >>> (\case [(_,[var])] -> True; _ -> False)
+isNewtype = _dcInn >>> _dciDefConVars >>> (\case [(_,[var])] -> True; _ -> False)
 
 -- Combinators for building statements and expressions
 

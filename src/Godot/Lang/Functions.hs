@@ -51,9 +51,9 @@ import Data.String.Interpolate (i)
 
 addBasicFunctions :: DefCls -> DefCls
 addBasicFunctions = addFuncsRecursive addSerToArr
-                  --addFuncsRecursive  . addSerToBin
+                  . addFuncsRecursive addSerToBin
                   . addFuncsRecursive addDesFromArr
-                  --addFuncsRecursive  . addDesFromBin
+                  . addFuncsRecursive addDesFromBin
                   . addFuncsRecursive addConShow
                   . addFuncsRecursive addCons
                   . addFuncsRecursive addEq
@@ -62,7 +62,7 @@ addBasicFunctions = addFuncsRecursive addSerToArr
 addCons :: DefCls -> [DefFunc]
 addCons dc@DefCls{..} =
   [ [i|Constructor function for sum constructor #{con}|] ###
-    stat_func (toLower <$> con) (join $ maybeToList $ M.lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName )
+    stat_func (toLower <$> con) (join $ maybeToList $ lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName )
       ( [ ("ret" -:: TypCls _dcName) -:= ERaw (cnName _dcName <> ".new()") ] <>
         [ ["ret", "con"] --= eCon con  | isSumType dc] <>
         [ ["ret",  vn] --= ERaw vn
@@ -70,7 +70,7 @@ addCons dc@DefCls{..} =
         ] <>
         [ StmtRet (ERaw "ret") ]
       )
-    | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+    | (EnumVal con, vs) <- _dciDefConVars _dcInn
   ]
 
 -- | Enrich DefCls  with show function (shows only constructor name)
@@ -84,13 +84,13 @@ addConShow dc@DefCls{..} =
     sumTypeMatch =
         [ StmtMatch (ERaw "self.con")
             ( [(eCon con , [StmtRet $ EStr con])
-              | (EnumVal con,_) <- toList $ _dciDefConVars _dcInn
+              | (EnumVal con,_) <- _dciDefConVars _dcInn
               ]
             , Just [StmtRet $ EStr ""] )
         ]
     prodTypeCase =
         [StmtRet $ EStr con
-        | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+        | (EnumVal con, vs) <- _dciDefConVars _dcInn
         ]
 
 
@@ -109,12 +109,12 @@ addEq dc@DefCls{..} =
       [ StmtRet $
          eId ["a","con"] -== eId ["b","con"]
          -&& EOr [ (eId ["a", "con"] -== eCon con) -&& exprClsEq vs
-                 | (EnumVal con,vs) <- toList $ _dciDefConVars _dcInn
+                 | (EnumVal con,vs) <- _dciDefConVars _dcInn
                  ]
       ]
     prodTypeCase =
       [ StmtRet $ exprClsEq vs
-      | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+      | (EnumVal con, vs) <- _dciDefConVars _dcInn
       ]
 
     -- | gd expression that tests equality based on selected constructor(optionally)
@@ -148,13 +148,13 @@ addSerToArr dc@DefCls{..} =
     sumTypeMatch =
       [ StmtMatch (ERaw "this.con")
           ( [ (eCon con , [ StmtRet $ exprClsSer (Just con) vs])
-            | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+            | (EnumVal con, vs) <- _dciDefConVars _dcInn
             ]
           , Just [StmtRet $ ERaw "[]"])
       ]
     prodTypeCase =
       [ StmtRet $ exprClsSer Nothing vs
-      | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn
+      | (EnumVal con, vs) <- _dciDefConVars _dcInn
       ]
 
     -- | gd expression that serializes class based on selected constructor(optionally)
@@ -200,13 +200,13 @@ addDesFromArr dc@DefCls{..} =
       [["ret", "con"] --= ERaw "arr[0]"
       , StmtMatch (ERaw "ret.con")
          ( [ (eCon con, stmtsClsDes 1 con vs)
-           | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
+           | (EnumVal con, vs) <- _dciDefConVars _dcInn, not $ null vs
            ]
          , Nothing)
       ]
     prodTypeCase =
       concat [ stmtsClsDes 0 con vs
-      | (EnumVal con, vs) <- toList $ _dciDefConVars _dcInn, not $ null vs
+      | (EnumVal con, vs) <- _dciDefConVars _dcInn, not $ null vs
       ]
 
     -- | gd statements that deserialize class based on selected constructor

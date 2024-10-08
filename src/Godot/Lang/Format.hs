@@ -59,13 +59,13 @@ fmtDefCls dc@(DefCls (ClsName cls) ext DefClsInn{..})
   [ if null _dciDefClasses then Nothing else Just $ addIndent (breakLines $ fmap fmtDefCls _dciDefClasses  )
   , if null enums then Nothing else Just $ addIndent (breakLines $ fmap fmtEnum enums)
   , if isSumType dc then Just $ addIndent "var con: Con" else Nothing
-  , Just $ addIndent (breakLines $ fmap fmtDefVar (_dciDefVars <> concatMap snd (toList _dciDefConVars)))
+  , Just $ addIndent (breakLines $ fmap fmtDefVar (_dciDefVars <> concatMap snd _dciDefConVars))
   , Just $ addIndent (breakSpacedLines $ fmap fmtDefFunc _dciDefFuncs )
   ])
   where
     -- | Regular enums + special constructor enum "Con" in case it has more than 1 value
     enums :: [(String, [EnumVal])]
-    enums = [("Con", M.keys _dciDefConVars) | isSumType dc]
+    enums = [("Con", fst <$> _dciDefConVars) | isSumType dc]
          <> toList _dciDefEnums
 
 fmtEnum :: (String, [EnumVal]) -> String
