@@ -1,4 +1,3 @@
-
 class CliMsg extends Object:
 
   enum Con { JOIN, LEAVE, MOVE, GET_STATE }
@@ -9,7 +8,7 @@ class CliMsg extends Object:
 
   #  Equality check of two CliMsg
   static func eq(a: CliMsg, b: CliMsg) -> bool:
-    return a.con==b.con && (a.con==Con.JOIN || a.con==Con.LEAVE || a.con==Con.MOVE && Dir.eq(a.fld_MOVE_0, b.fld_MOVE_0) || a.con==Con.GET_STATE)
+    return a.con==b.con && (a.con==Con.JOIN || a.con==Con.LEAVE || a.con==Con.MOVE && a.fld_MOVE_0==b.fld_MOVE_0 || a.con==Con.GET_STATE)
 
 
   #  Non-static equality check of two CliMsg
@@ -71,7 +70,7 @@ class CliMsg extends Object:
     var ret: CliMsg = CliMsg.new()
     ret.con = arr[0]
     match ret.con:
-      Con.MOVE:   ret.fld_MOVE_0 = Dir.desFromArr(arr)
+      Con.MOVE:   ret.fld_MOVE_0 = arr[1]
 
 
     return ret
@@ -89,7 +88,7 @@ class CliMsg extends Object:
 
       Con.LEAVE:   return [ Con.LEAVE ]
 
-      Con.MOVE:   return [ Con.MOVE, Dir.serToArr(this.fld_MOVE_0) ]
+      Con.MOVE:   return [ Con.MOVE, this.fld_MOVE_0 ]
 
       Con.GET_STATE:   return [ Con.GET_STATE ]
 

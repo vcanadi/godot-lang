@@ -68,7 +68,7 @@ instance (KnownSymbol con, GDCIπ f) => GDCIΣ (C1 ('MetaCons con fix hasRec) f)
 
 -- | "GenericDefCls" logic on generic product type
 class GDCIπ (f :: Type -> Type)                                                            where gDCIπ :: Int -> Proxy f -> EnumVal -> DefClsInn -> DefClsInn
-instance (GDCIπ f, GDCIπ g, MW f) => GDCIπ (f :*: g)                                       where gDCIπ i _ = (>>>) <$> gDCIπ i (Proxy @f) <*> gDCIπ (i + mW (Proxy @f)) (Proxy @g)
+instance (GDCIπ f, GDCIπ g, MW f)   => GDCIπ (f :*: g)                                     where gDCIπ i _ = (>>>) <$> gDCIπ i (Proxy @f) <*> gDCIπ (i + mW (Proxy @f)) (Proxy @g)
 instance (KnownSymbol fld, ToTyp f) => GDCIπ (S1 ('MetaSel ('Just fld) su ss ds) (Rec0 f)) where gDCIπ _ _ = addRecDefVar @fld (toTyp @f)
 instance (ToTyp f)                  => GDCIπ (S1 ('MetaSel 'Nothing su ss ds) (Rec0 f))    where gDCIπ i _ = addConDefVar i (toTyp @f)
 instance                               GDCIπ U1                                            where gDCIπ _ _ = const id
@@ -81,8 +81,10 @@ genToTyp :: forall a . (GToTyp (Rep a)) => Typ
 genToTyp = gToTyp (Proxy @(Rep a))
 
 -- | Typeclass whose instances (generic representations) know their type name/label
-class GToTyp (f :: Type -> Type)                                                              where gToTyp :: Proxy f -> Typ
-instance {-# OVERLAPPABLE #-} (KnownSymbol dat) => GToTyp (M1 D ('MetaData dat m fn isnt) f)  where gToTyp _  = TypCls $ ClsName $ symbolVal (Proxy @dat)
+class GToTyp (f :: Type -> Type)                                                                    where gToTyp :: Proxy f -> Typ
+instance {-# OVERLAPPABLE #-} (KnownSymbol dat, MW f) => GToTyp (M1 D ('MetaData dat m fn isnt) f)  where gToTyp _  = if mW (Proxy @f) == 0
+                                                                                                                         then TypEnum  $ symbolVal (Proxy @dat)
+                                                                                                                         else TypCls $ ClsName $ symbolVal (Proxy @dat)
 -- instance {-# OVERLAPS #-}                          GToTyp (M1 D ('MetaData "[]" m fn isnt) f) where gToTyp _  = TypArr
 
 -- | For any type with Generic instance, default to gToTyp as type name/label

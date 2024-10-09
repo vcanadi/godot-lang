@@ -52,7 +52,8 @@ breakSpacedLines = intercalate "\n\n"
 
 fmtDefCls :: DefCls -> String
 fmtDefCls dc@(DefCls (ClsName cls) ext DefClsInn{..})
-  = [i|class #{cls} extends #{if ext == ExtendsObject then "Object" else "Reference"}:
+  | isEnum dc = fmtEnum (cls, fst <$> _dciDefConVars)
+  | otherwise = [i|class #{cls} extends #{if ext == ExtendsObject then "Object" else "Reference"}:
 
 |]
   <> breakLines (catMaybes

@@ -340,7 +340,12 @@ isSumType = (>1) . length . fmap fst . _dciDefConVars . _dcInn
 
 -- | Check if it has single constructor and single variable (newtype or data)
 isNewtype :: DefCls -> Bool
-isNewtype = _dcInn >>> _dciDefConVars >>> (\case [(_,[var])] -> True; _ -> False)
+isNewtype = _dcInn >>> _dciDefConVars >>> (\case [(_,[_])] -> True; _ -> False)
+
+-- | Check if each constructor has 0 arguments
+isEnum :: DefCls -> Bool
+isEnum = _dcInn >>> _dciDefConVars >>> all (snd >>> null)
+
 
 -- Combinators for building statements and expressions
 

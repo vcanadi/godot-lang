@@ -31,6 +31,7 @@ import Data.Maybe (maybeToList)
 import Control.Monad (join)
 import Godot.Lang.Core
 import Data.String.Interpolate (i)
+import Data.Bool (bool)
 
 
 -- perTypDefFunc dc comm fn args retTyp =
@@ -50,13 +51,16 @@ import Data.String.Interpolate (i)
 --         ]
 
 addBasicFunctions :: DefCls -> DefCls
-addBasicFunctions = addFuncsRecursive addSerToArr
+addBasicFunctions = bool
+                <$> id
+                <*> addFuncsRecursive addSerToArr
                   . addFuncsRecursive addSerToBin
                   . addFuncsRecursive addDesFromArr
                   . addFuncsRecursive addDesFromBin
                   . addFuncsRecursive addConShow
                   . addFuncsRecursive addCons
                   . addFuncsRecursive addEq
+                <*> not . isEnum
 
 -- | Enrich DefCls with "constructor" functions for each constructor in sum type
 addCons :: DefCls -> [DefFunc]
@@ -158,19 +162,21 @@ addSerToArr dc@DefCls{..} =
       ]
 
     -- | gd expression that serializes class based on selected constructor(optionally)
+    exprClsSer :: Maybe String -> [DefVar] -> Expr Arr
     exprClsSer conMb vs = case conMb of
-      -- | No constructor (product type)
+      -- | Single constructor (product type)
       Nothing -> case vs of
-        -- | Single product argument (newtype or data)
+        -- | Single product argument (newtype or data with 1 arg)
         [DefVar (VarName vn) typ] -> exprValueSer ("this." <> vn) typ
         -- | Multiple product arguments
         _                         -> EArr [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
-      -- | Existing constructor (sum type)
+      -- | Multiple constructors (sum type)
       Just con -> EArr $ [EElem $ eCon con] <> [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
 
 
 
     -- | gd expression that serializes value
+    exprValueSer :: String -> Typ -> Expr t
     exprValueSer vn typ = case typ of
       TypCls (ClsName cn) ->  ERaw $ cn <> ".serToArr(" <> vn <> ")"
       TypArr typ' -> (vn <> ".map") --$ ["x" --> exprValueSer "x" typ']
@@ -199,24 +205,33 @@ addDesFromArr dc@DefCls{..} =
     sumTypeMatch =
       [["ret", "con"] --= ERaw "arr[0]"
       , StmtMatch (ERaw "ret.con")
-         ( [ (eCon con, stmtsClsDes 1 con vs)
+         ( [ (eCon con, stmtsClsDes (Just con) con vs)
            | (EnumVal con, vs) <- _dciDefConVars _dcInn, not $ null vs
            ]
          , Nothing)
       ]
     prodTypeCase =
-      concat [ stmtsClsDes 0 con vs
+      concat [ stmtsClsDes Nothing con vs
       | (EnumVal con, vs) <- _dciDefConVars _dcInn, not $ null vs
       ]
 
     -- | gd statements that deserialize class based on selected constructor
-    stmtsClsDes :: Int -> p -> [DefVar] -> [Stmt]
-    stmtsClsDes start con vs = case vs of
-      [DefVar (VarName vn) typ] -> stmtsValueDes "arr" ("ret." <> vn) 0 typ
-      _                         -> concat
-        [  stmtsValueDes ("arr[" <> show i <> "]") ("ret." <> vn) 0 typ
-        | (i, DefVar (VarName vn) typ) <- zip [start..] vs
-        ]
+    stmtsClsDes :: Maybe String -> p -> [DefVar] -> [Stmt]
+    stmtsClsDes conMb con vs = case conMb of
+      -- | No constructor (product type)
+      Nothing -> case vs of
+        -- | Single product argument (newtype or data)
+        [DefVar (VarName vn) typ] -> stmtsValueDes "arr" ("ret." <> vn) 0 typ
+        -- | Multiple product arguments
+        _                         -> concat
+          [  stmtsValueDes ("arr[" <> show i <> "]") ("ret." <> vn) 0 typ
+          | (i, DefVar (VarName vn) typ) <- zip [0..] vs
+          ]
+      -- | Multiple constructors (sum type)
+      Just con ->  concat
+          [  stmtsValueDes ("arr[" <> show i <> "]") ("ret." <> vn) 0 typ
+          | (i, DefVar (VarName vn) typ) <- zip [1..] vs
+          ]
 
     ixVar :: String -> Int -> String
     ixVar s n = s <> ['_',chr $ ord 'A' + n]
