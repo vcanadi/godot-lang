@@ -16,7 +16,6 @@ import Data.Kind (Type)
 import GHC.TypeLits
 
 import Data.Proxy
-import Godot.Lang.Kind.General
 import GHC.Generics (M1 (..), (:+:) (..), (:*:) ((:*:)), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1, K1)
 import Control.Lens.TH(makeLenses)
 import Control.Lens
@@ -28,6 +27,7 @@ import Godot.Lang.Core
 import Godot.Lang.Functions
 import Godot.Lang.Format
 import Language.Haskell.TH (Q, Exp, runIO)
+import Godot.Lang.Kind.General
 
 -- Helpers
 --
@@ -53,9 +53,28 @@ genGDScript dir =  writeFile (dir <> "/" <> cnName (_dcName dc) <> ".gd") $ fmtD
     where
       dc = addBasicFunctions $ genDefCls @a
 
+-- | Generate GD script of classes for a corresponging type list
+genGDScript' :: forall as. (GDCs (FmapRep as)) => FilePath -> IO ()
+genGDScript' dir =  writeFile (dir <> "/common.gd" ) $ intercalate "\n\n" $ fmtDefCls <$> dcs
+    where
+      dcs = addBasicFunctions <$> genDefCls' @as
+
 -- | Wrapper function. For a type with GCD instance on its representation, build DefCls generically
 genDefCls :: forall a. (GDC (Rep a)) => DefCls
-genDefCls = gDC  (Proxy @(Rep a))
+genDefCls = gDC $ Proxy @(Rep a)
+
+type family FmapRep as where
+  FmapRep '[]           = '[]
+  FmapRep (a ': as) =  Rep a ': FmapRep as
+
+-- | For a list of types with GCD instances on their representation, build DefCls' generically
+genDefCls' :: forall as. (GDCs (FmapRep as)) => [DefCls]
+genDefCls' = gDCs $ Proxy @(FmapRep as)
+
+-- | Typeclass plural of GDC that works on a type level list
+class GDCs (fs :: [Type -> Type])           where gDCs :: Proxy fs -> [DefCls]
+instance                     GDCs '[]       where gDCs _ = []
+instance (GDC f, GDCs fs) => GDCs (f ': fs) where gDCs _ = gDC (Proxy @f) : gDCs (Proxy @fs)
 
 -- | Typeclass "GenericDefCls" whose instances (generic representations) know how to render themself into DefCls
 class GDC (f :: Type -> Type)                                                 where gDC :: Proxy f -> DefCls
@@ -75,7 +94,6 @@ instance                               GDCIπ U1                                
 
 -- Generic represenation of a type name/label
 --
---
 -- | Wrapper function. For a type with GToTyp instance on its representation, show its type name/label
 genToTyp :: forall a . (GToTyp (Rep a)) => Typ
 genToTyp = gToTyp (Proxy @(Rep a))
@@ -85,7 +103,6 @@ class GToTyp (f :: Type -> Type)                                                
 instance {-# OVERLAPPABLE #-} (KnownSymbol dat, MW f) => GToTyp (M1 D ('MetaData dat m fn isnt) f)  where gToTyp _  = if mW (Proxy @f) == 0
                                                                                                                          then TypEnum  $ symbolVal (Proxy @dat)
                                                                                                                          else TypCls $ ClsName $ symbolVal (Proxy @dat)
--- instance {-# OVERLAPS #-}                          GToTyp (M1 D ('MetaData "[]" m fn isnt) f) where gToTyp _  = TypArr
 
 -- | For any type with Generic instance, default to gToTyp as type name/label
 instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a

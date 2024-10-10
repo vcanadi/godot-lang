@@ -56,9 +56,9 @@ import GHC.Base (Type)
 -- data Nat = Zero | Succ Nat
 --   deriving (Show)
 
--- type family Fmap (f :: i -> j) (as :: [i]) = (bs :: [j]) | bs -> f where
---   Fmap f '[a]           = '[f a]
---   Fmap f (a ': b ': as) =  f a ': Fmap f (b ': as)
+type family Fmap (f :: i -> j) (as :: [i]) = (bs :: [j]) | bs -> f where
+  Fmap f '[a]           = '[f a]
+  Fmap f (a ': b ': as) =  f a ': Fmap f (b ': as)
 
 -- type family Foldl (f :: j -> i -> j) (b :: j) (as :: [i]) = (r :: j) where
 --   Foldl _ b '[] = b
