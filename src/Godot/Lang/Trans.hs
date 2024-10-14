@@ -16,7 +16,7 @@ import Data.Kind (Type)
 import GHC.TypeLits
 
 import Data.Proxy
-import GHC.Generics (M1 (..), (:+:) (..), (:*:) ((:*:)), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1, K1)
+import GHC.Generics (M1 (..), (:+:) (..), (:*:) ((:*:)), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1, K1, D1)
 import Control.Lens.TH(makeLenses)
 import Control.Lens
 import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
@@ -28,16 +28,26 @@ import Godot.Lang.Functions
 import Godot.Lang.Format
 import Language.Haskell.TH (Q, Exp, runIO)
 import Godot.Lang.Kind.General
+import Data.Generics (typeRep, Typeable)
 
 -- Helpers
 --
 -- | Max Width (max number of fields of any product)
-class MW (f :: * -> *)                where mW :: Proxy f -> Int
-instance (MW f, MW g) => MW (f :+: g) where mW _ = max (mW (Proxy @f)) (mW (Proxy @g))
-instance (MW f, MW g) => MW (f :*: g) where mW _ = mW (Proxy @f) + mW (Proxy @g)
-instance MW (K1 i c)                  where mW _ = 1
-instance MW f => MW (M1 i t f)        where mW _ = mW (Proxy @f)
-instance MW U1                        where mW _ = 0
+class                    MW (f :: * -> *) where mW :: Proxy f -> Int
+instance (MW f, MW g) => MW (f :+: g)     where mW _ = max (mW (Proxy @f)) (mW (Proxy @g))
+instance (MW f, MW g) => MW (f :*: g)     where mW _ = mW (Proxy @f) + mW (Proxy @g)
+instance                 MW (K1 i c)      where mW _ = 1
+instance MW f         => MW (M1 i t f)    where mW _ = mW (Proxy @f)
+instance                 MW U1            where mW _ = 0
+
+class Name (f :: * -> *)                                                    where name :: Proxy f -> String
+instance (Name f, KnownSymbol dat) => Name (D1 ('MetaData dat m fn isnt) f) where name _ =  symbolVal (Proxy @dat) <> name (Proxy @f)
+instance (Name f, Name g) => Name (f :+: g)                                 where name _ = name (Proxy @f) <> name (Proxy @g)
+instance (Name f, Name g) => Name (f :*: g)                                 where name _ = name (Proxy @f) <> name (Proxy @g)
+instance Name f => Name (C1 ('MetaCons c fi r) f)                           where name _ = name (Proxy @f)
+instance Typeable f => Name (S1 ('MetaSel rec su ss ds) (Rec0 f))           where name _ = show (typeRep (Proxy @f))
+instance Name (K1 i c)                                                      where name _ = ""
+instance Name U1                                                            where name _ = ""
 
 -- Translation from Haskell type into Godot class
 
@@ -77,13 +87,13 @@ instance                     GDCs '[]       where gDCs _ = []
 instance (GDC f, GDCs fs) => GDCs (f ': fs) where gDCs _ = gDC (Proxy @f) : gDCs (Proxy @fs)
 
 -- | Typeclass "GenericDefCls" whose instances (generic representations) know how to render themself into DefCls
-class GDC (f :: Type -> Type)                                                 where gDC :: Proxy f -> DefCls
-instance (GDCIΣ f, KnownSymbol dat) => GDC (M1 D ('MetaData dat m fn isnt) f) where gDC _  = DefCls (ClsName $ symbolVal (Proxy @dat)) ExtendsObject $ gDCIΣ (Proxy @f) mempty
+class GDC (f :: Type -> Type)                                                                         where gDC :: Proxy f -> DefCls
+instance (GDCIΣ f, Name (M1 D ('MetaData dat m fn isnt) f)) => GDC (M1 D ('MetaData dat m fn isnt) f) where gDC _  = DefCls (ClsName $ name (Proxy @(M1 D ('MetaData dat m fn isnt) f))) ExtendsObject $ gDCIΣ (Proxy @f) mempty
 
 -- | "GenericDefCls" logic on generic sum type
-class GDCIΣ (f :: Type -> Type)                                                where gDCIΣ :: Proxy f -> DefClsInn -> DefClsInn
-instance (GDCIΣ f, GDCIΣ g)         => GDCIΣ (f :+: g)                         where gDCIΣ _ = gDCIΣ (Proxy @f) >>> gDCIΣ (Proxy @g)
-instance (KnownSymbol con, GDCIπ f) => GDCIΣ (C1 ('MetaCons con fix hasRec) f) where gDCIΣ _ = addCon @con >>> gDCIπ 0 (Proxy @f) (enumVal @con)
+class GDCIΣ (f :: Type -> Type)                                      where gDCIΣ :: Proxy f -> DefClsInn -> DefClsInn
+instance (GDCIΣ f, GDCIΣ g)       => GDCIΣ (f :+: g)                 where gDCIΣ _ = gDCIΣ (Proxy @f) >>> gDCIΣ (Proxy @g)
+instance (KnownSymbol c, GDCIπ f) => GDCIΣ (C1 ('MetaCons c fi r) f) where gDCIΣ _ = addCon @c >>> gDCIπ 0 (Proxy @f) (enumVal @c)
 
 -- | "GenericDefCls" logic on generic product type
 class GDCIπ (f :: Type -> Type)                                                            where gDCIπ :: Int -> Proxy f -> EnumVal -> DefClsInn -> DefClsInn
