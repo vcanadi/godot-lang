@@ -3,10 +3,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Godot.Lang.Trans where
 
@@ -16,7 +16,7 @@ import Data.Kind (Type)
 import GHC.TypeLits
 
 import Data.Proxy
-import GHC.Generics (M1 (..), (:+:) (..), (:*:) ((:*:)), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1, K1, D1)
+import GHC.Generics (M1 (..), (:+:) (..), (:*:) ((:*:)), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1, K1, D1, Datatype (datatypeName))
 import Control.Lens.TH(makeLenses)
 import Control.Lens
 import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
@@ -28,7 +28,7 @@ import Godot.Lang.Functions
 import Godot.Lang.Format
 import Language.Haskell.TH (Q, Exp, runIO)
 import Godot.Lang.Kind.General
-import Data.Generics (typeRep, Typeable)
+import Data.Typeable (typeRep, Typeable)
 
 -- Helpers
 --
@@ -40,14 +40,16 @@ instance                 MW (K1 i c)      where mW _ = 1
 instance MW f         => MW (M1 i t f)    where mW _ = mW (Proxy @f)
 instance                 MW U1            where mW _ = 0
 
-class Name (f :: * -> *)                                                    where name :: Proxy f -> String
-instance (Name f, KnownSymbol dat) => Name (D1 ('MetaData dat m fn isnt) f) where name _ =  symbolVal (Proxy @dat) <> name (Proxy @f)
-instance (Name f, Name g) => Name (f :+: g)                                 where name _ = name (Proxy @f) <> name (Proxy @g)
-instance (Name f, Name g) => Name (f :*: g)                                 where name _ = name (Proxy @f) <> name (Proxy @g)
-instance Name f => Name (C1 ('MetaCons c fi r) f)                           where name _ = name (Proxy @f)
-instance Typeable f => Name (S1 ('MetaSel rec su ss ds) (Rec0 f))           where name _ = show (typeRep (Proxy @f))
-instance Name (K1 i c)                                                      where name _ = ""
-instance Name U1                                                            where name _ = ""
+data Dummy (t :: Meta) (c :: Type -> Type) f = Dummy
+
+class Name (f :: * -> *)                                           where name :: Proxy f -> String
+instance (Name f, Datatype m) => Name (D1 m f)                     where name _ =  datatypeName @m Dummy
+instance (Name f, Name g) => Name (f :+: g)                        where name _ = name (Proxy @f) <> name (Proxy @g)
+instance (Name f, Name g) => Name (f :*: g)                        where name _ = name (Proxy @f) <> name (Proxy @g)
+instance Name f => Name (C1 ('MetaCons c fi r) f)                  where name _ = name (Proxy @f)
+instance Typeable f => Name (S1 ('MetaSel rec su ss ds) (Rec0 f))  where name _ = show (typeRep (Proxy @f))
+instance Name (K1 i c)                                             where name _ = ""
+instance Name U1                                                   where name _ = ""
 
 -- Translation from Haskell type into Godot class
 

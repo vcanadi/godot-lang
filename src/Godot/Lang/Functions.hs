@@ -101,7 +101,7 @@ addConShow dc@DefCls{..} =
 -- | Eq instances
 addEq :: DefCls -> [DefFunc]
 addEq dc@DefCls{..} =
-  [ [i| Equality check of two #{cnName _dcName} |] ###
+  [ [i| Equality check on type: #{cnName _dcName} |] ###
     stat_func "eq" ["a" -:: TypCls _dcName, "b" -:: TypCls _dcName] (TypPrim PTBool)
       (if isSumType dc then sumTypeCase else prodTypeCase)
 

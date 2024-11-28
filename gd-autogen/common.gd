@@ -1,6 +1,6 @@
 enum Dir { L, R, U, D }
 
-class CliMsgDir extends Object:
+class CliMsg extends Object:
 
   enum Con { JOIN, LEAVE, MOVE, GET_STATE }
 
@@ -8,41 +8,41 @@ class CliMsgDir extends Object:
 
   var fld_MOVE_0: Dir
 
-  #  Equality check of two CliMsgDir 
-  static func eq(a: CliMsgDir, b: CliMsgDir) -> bool:
+  #  Equality check on type: CliMsg 
+  static func eq(a: CliMsg, b: CliMsg) -> bool:
     return a.con==b.con && (a.con==Con.JOIN || a.con==Con.LEAVE || a.con==Con.MOVE && a.fld_MOVE_0==b.fld_MOVE_0 || a.con==Con.GET_STATE) 
   
   
-  #  Non-static equality check of two CliMsgDir 
-  func eq1(b: CliMsgDir) -> bool:
-    return CliMsgDir.eq(self, b) 
+  #  Non-static equality check of two CliMsg 
+  func eq1(b: CliMsg) -> bool:
+    return CliMsg.eq(self, b) 
   
   
   # Constructor function for sum constructor JOIN
-  static func join() -> CliMsgDir:
-    var ret: CliMsgDir = CliMsgDir.new() 
+  static func join() -> CliMsg:
+    var ret: CliMsg = CliMsg.new() 
     ret.con = Con.JOIN
     return ret 
   
   
   # Constructor function for sum constructor LEAVE
-  static func leave() -> CliMsgDir:
-    var ret: CliMsgDir = CliMsgDir.new() 
+  static func leave() -> CliMsg:
+    var ret: CliMsg = CliMsg.new() 
     ret.con = Con.LEAVE
     return ret 
   
   
   # Constructor function for sum constructor MOVE
-  static func move(fld_MOVE_0: Dir) -> CliMsgDir:
-    var ret: CliMsgDir = CliMsgDir.new() 
+  static func move(fld_MOVE_0: Dir) -> CliMsg:
+    var ret: CliMsg = CliMsg.new() 
     ret.con = Con.MOVE
     ret.fld_MOVE_0 = fld_MOVE_0
     return ret 
   
   
   # Constructor function for sum constructor GET_STATE
-  static func get_state() -> CliMsgDir:
-    var ret: CliMsgDir = CliMsgDir.new() 
+  static func get_state() -> CliMsg:
+    var ret: CliMsg = CliMsg.new() 
     ret.con = Con.GET_STATE
     return ret 
   
@@ -63,13 +63,13 @@ class CliMsgDir extends Object:
   
   
   # Deserialize from binary
-  static func des(this: PackedByteArray) -> CliMsgDir:
+  static func des(this: PackedByteArray) -> CliMsg:
     return desFromArr(bytes_to_var(this)) 
   
   
   # Deserialize from array
-  static func desFromArr(arr: Array[Variant]) -> CliMsgDir:
-    var ret: CliMsgDir = CliMsgDir.new() 
+  static func desFromArr(arr: Array[Variant]) -> CliMsg:
+    var ret: CliMsg = CliMsg.new() 
     ret.con = arr[0]
     match ret.con:
       Con.MOVE:   ret.fld_MOVE_0 = arr[1]
@@ -79,12 +79,12 @@ class CliMsgDir extends Object:
   
   
   # Serialize to binary
-  static func ser(this: CliMsgDir) -> PackedByteArray:
+  static func ser(this: CliMsg) -> PackedByteArray:
     return var_to_bytes(serToArr(this)) 
   
   
   # Serialize to array
-  static func serToArr(this: CliMsgDir) -> Array[Variant]:
+  static func serToArr(this: CliMsg) -> Array[Variant]:
     match this.con:
       Con.JOIN:   return [ Con.JOIN ]  
       
@@ -98,14 +98,14 @@ class CliMsgDir extends Object:
       
 
 
-class SrvMsgMap SockAddr Pos extends Object:
+class SrvMsg extends Object:
 
   class P_SockAddr_Pos_P extends Object:
   
     var snd: Pos
     var fst: SockAddr
   
-    #  Equality check of two P_SockAddr_Pos_P 
+    #  Equality check on type: P_SockAddr_Pos_P 
     static func eq(a: P_SockAddr_Pos_P, b: P_SockAddr_Pos_P) -> bool:
       return Pos.eq(a.snd, b.snd) && SockAddr.eq(a.fst, b.fst) 
     
@@ -152,19 +152,19 @@ class SrvMsgMap SockAddr Pos extends Object:
 
   var model: Array[P_SockAddr_Pos_P]
 
-  #  Equality check of two SrvMsgMap SockAddr Pos 
-  static func eq(a: SrvMsgMap SockAddr Pos, b: SrvMsgMap SockAddr Pos) -> bool:
+  #  Equality check on type: SrvMsg 
+  static func eq(a: SrvMsg, b: SrvMsg) -> bool:
     return a.model.reduce(func(acc,x): return [ acc[0] && P_SockAddr_Pos_P.eq(x, b.model[acc[1]]), acc[1] + 1 ] , [true, 0])[0] 
   
   
-  #  Non-static equality check of two SrvMsgMap SockAddr Pos 
-  func eq1(b: SrvMsgMap SockAddr Pos) -> bool:
-    return SrvMsgMap SockAddr Pos.eq(self, b) 
+  #  Non-static equality check of two SrvMsg 
+  func eq1(b: SrvMsg) -> bool:
+    return SrvMsg.eq(self, b) 
   
   
   # Constructor function for sum constructor PUT_STATE
-  static func put_state(model: Array[P_SockAddr_Pos_P]) -> SrvMsgMap SockAddr Pos:
-    var ret: SrvMsgMap SockAddr Pos = SrvMsgMap SockAddr Pos.new() 
+  static func put_state(model: Array[P_SockAddr_Pos_P]) -> SrvMsg:
+    var ret: SrvMsg = SrvMsg.new() 
     ret.model = model
     return ret 
   
@@ -175,28 +175,28 @@ class SrvMsgMap SockAddr Pos extends Object:
   
   
   # Deserialize from binary
-  static func des(this: PackedByteArray) -> SrvMsgMap SockAddr Pos:
+  static func des(this: PackedByteArray) -> SrvMsg:
     return desFromArr(bytes_to_var(this)) 
   
   
   # Deserialize from array
-  static func desFromArr(arr: Array[Variant]) -> SrvMsgMap SockAddr Pos:
-    var ret: SrvMsgMap SockAddr Pos = SrvMsgMap SockAddr Pos.new() 
+  static func desFromArr(arr: Array[Variant]) -> SrvMsg:
+    var ret: SrvMsg = SrvMsg.new() 
     ret.model.assign(arr.map(P_SockAddr_Pos_P.desFromArr))
     return ret 
   
   
   # Serialize to binary
-  static func ser(this: SrvMsgMap SockAddr Pos) -> PackedByteArray:
+  static func ser(this: SrvMsg) -> PackedByteArray:
     return var_to_bytes(serToArr(this)) 
   
   
   # Serialize to array
-  static func serToArr(this: SrvMsgMap SockAddr Pos) -> Array[Variant]:
+  static func serToArr(this: SrvMsg) -> Array[Variant]:
     return this.model.map(func(x): return P_SockAddr_Pos_P.serToArr(x)) 
 
 
-class MaybeDir extends Object:
+class Maybe extends Object:
 
   enum Con { Nothing, Just }
 
@@ -204,26 +204,26 @@ class MaybeDir extends Object:
 
   var fld_Just_0: Dir
 
-  #  Equality check of two MaybeDir 
-  static func eq(a: MaybeDir, b: MaybeDir) -> bool:
+  #  Equality check on type: Maybe 
+  static func eq(a: Maybe, b: Maybe) -> bool:
     return a.con==b.con && (a.con==Con.Nothing || a.con==Con.Just && a.fld_Just_0==b.fld_Just_0) 
   
   
-  #  Non-static equality check of two MaybeDir 
-  func eq1(b: MaybeDir) -> bool:
-    return MaybeDir.eq(self, b) 
+  #  Non-static equality check of two Maybe 
+  func eq1(b: Maybe) -> bool:
+    return Maybe.eq(self, b) 
   
   
   # Constructor function for sum constructor Nothing
-  static func nothing() -> MaybeDir:
-    var ret: MaybeDir = MaybeDir.new() 
+  static func nothing() -> Maybe:
+    var ret: Maybe = Maybe.new() 
     ret.con = Con.Nothing
     return ret 
   
   
   # Constructor function for sum constructor Just
-  static func just(fld_Just_0: Dir) -> MaybeDir:
-    var ret: MaybeDir = MaybeDir.new() 
+  static func just(fld_Just_0: Dir) -> Maybe:
+    var ret: Maybe = Maybe.new() 
     ret.con = Con.Just
     ret.fld_Just_0 = fld_Just_0
     return ret 
@@ -241,13 +241,13 @@ class MaybeDir extends Object:
   
   
   # Deserialize from binary
-  static func des(this: PackedByteArray) -> MaybeDir:
+  static func des(this: PackedByteArray) -> Maybe:
     return desFromArr(bytes_to_var(this)) 
   
   
   # Deserialize from array
-  static func desFromArr(arr: Array[Variant]) -> MaybeDir:
-    var ret: MaybeDir = MaybeDir.new() 
+  static func desFromArr(arr: Array[Variant]) -> Maybe:
+    var ret: Maybe = Maybe.new() 
     ret.con = arr[0]
     match ret.con:
       Con.Just:   ret.fld_Just_0 = arr[1]
@@ -257,12 +257,12 @@ class MaybeDir extends Object:
   
   
   # Serialize to binary
-  static func ser(this: MaybeDir) -> PackedByteArray:
+  static func ser(this: Maybe) -> PackedByteArray:
     return var_to_bytes(serToArr(this)) 
   
   
   # Serialize to array
-  static func serToArr(this: MaybeDir) -> Array[Variant]:
+  static func serToArr(this: Maybe) -> Array[Variant]:
     match this.con:
       Con.Nothing:   return [ Con.Nothing ]  
       
