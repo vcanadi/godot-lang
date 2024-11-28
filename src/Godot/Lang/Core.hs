@@ -66,10 +66,6 @@ newtype Iden = Iden { idenId :: [String] }  deriving(Eq, Show, Semigroup, Monoid
 -- | Call to some godot function
 newtype FuncName = FuncName { cfFunc :: String } deriving (Eq, Show)
 
--- | Generate enum val from type level string (symbol)
-enumVal :: forall con. (KnownSymbol con) => EnumVal
-enumVal = EnumVal $ symbolVal (Proxy @con)
-
 -- | Inheritacne 'extends' expression
 data Extends = ExtendsObject
              | ExtendsReference
@@ -312,8 +308,8 @@ addToConEnum v = dciDefConVars %~ (<> [(EnumVal v, [])])
 
 -- | Add a variable definition that holds some sum type constructor's record value
 -- Additionally construct class inner type in case that is wanted (e.g. if type is a TypPair (helper type collection mimicing type variables))
-addRecDefVar :: forall fld typ. (KnownSymbol fld) => Typ -> EnumVal -> DefClsInn -> DefClsInn
-addRecDefVar typ con = (dciDefConVars %~ insertWithL (flip (<>)) con [symbolVal (Proxy @fld) -:: typ ])
+addRecDefVar :: String -> Typ -> EnumVal -> DefClsInn -> DefClsInn
+addRecDefVar fld typ con = (dciDefConVars %~ insertWithL (flip (<>)) con [fld -:: typ ])
                      . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
 
 -- | Add a variable definition that holds some sum type constructor's unnamed value
@@ -325,8 +321,8 @@ addTypPairCls :: Typ -> Typ -> DefClsInn -> DefClsInn
 addTypPairCls a b = dciDefClasses %~ (mkTypPairCls:)
   where
     mkTypPairCls = DefCls (ClsName $ pairName (TypPair a b)) ExtendsObject
-                     (emptyDefClsInn & addRecDefVar @"fst" a (EnumVal "P")
-                                     & addRecDefVar @"snd" b (EnumVal "P"))
+                     (emptyDefClsInn & addRecDefVar "fst" a (EnumVal "P")
+                                     & addRecDefVar "snd" b (EnumVal "P"))
 
 -- | Add functions to the class and every class defined within
 addFuncsRecursive :: (DefCls -> [DefFunc]) -> DefCls -> DefCls
