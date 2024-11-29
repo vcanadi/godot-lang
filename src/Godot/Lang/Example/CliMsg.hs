@@ -1,10 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
 
 module Godot.Lang.Example.CliMsg where
 
-import Godot.Lang.Trans
 import GHC.Generics (Generic)
-import Language.Haskell.TH (Q, Exp, runIO)
+import Godot.Lang.Class (ToDefCls)
 
 -- data CliMsg
 --   = JOIN
@@ -27,9 +25,4 @@ data CliMsg
   | GET_STATE
   deriving (Show, Eq, Read, Generic)
 
-
-
-generateGDScript :: Q Exp
-generateGDScript = do
-    runIO $ genGDScript @CliMsg "./gd-autogen"
-    [| "This is generated at compile-time." |]
+instance ToDefCls CliMsg
