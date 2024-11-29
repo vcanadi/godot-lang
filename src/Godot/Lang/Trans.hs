@@ -8,6 +8,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{- | Translation from Generic representation of Haskell type to DefCls
+-}
 module Godot.Lang.Trans where
 
 import Linear.V2(V2)
@@ -27,21 +29,8 @@ import Godot.Lang.Core
 import Godot.Lang.Functions
 import Godot.Lang.Format
 import Language.Haskell.TH (Q, Exp, runIO)
-import Godot.Lang.Kind.General
 import Data.Typeable (typeRep, Typeable, TypeRep)
-
--- Helpers
---
--- | Max Width (max number of fields of any product)
-class                    MW (f :: * -> *) where mW :: Proxy f -> Int
-instance (MW f, MW g) => MW (f :+: g)     where mW _ = max (mW (Proxy @f)) (mW (Proxy @g))
-instance (MW f, MW g) => MW (f :*: g)     where mW _ = mW (Proxy @f) + mW (Proxy @g)
-instance                 MW (K1 i c)      where mW _ = 1
-instance MW f         => MW (M1 i t f)    where mW _ = mW (Proxy @f)
-instance                 MW U1            where mW _ = 0
-
--- | Dummy type used for GHC.Generic functions (datatype|con|sel)Name
-data Dmy (t :: Meta) (c :: Type -> Type) f = Dmy
+import Godot.Lang.Util
 
 -- Translation from Haskell type into Godot class
 
@@ -62,11 +51,6 @@ genGDScript' :: forall as. (GenDCs as) => FilePath -> IO ()
 genGDScript' dir =  writeFile (dir <> "/common.gd" ) $ intercalate "\n\n" $ fmtDefCls <$> dcs
     where
       dcs = addBasicFunctions <$> genDCs (Proxy @as)
-
-
-type family FmapRep as where
-  FmapRep '[]           = '[]
-  FmapRep (a ': as) =  Rep a ': FmapRep as
 
 -- | Apply genDC on multiple types
 class GenDCs (as :: [Type])                                       where genDCs :: Proxy as -> [DefCls]
@@ -110,5 +94,3 @@ instance {-# OVERLAPPABLE #-} (MW f) => GToTyp (D1 m f) where gToTyp tNm _  = (i
 
 -- | For any type with Generic instance, default to gToTyp as type name/label
 instance {-# OVERLAPPABLE #-} (GToTyp (Rep a), Typeable a) => ToTyp a where toTyp = genToTyp @a (typeName @a)
-
-

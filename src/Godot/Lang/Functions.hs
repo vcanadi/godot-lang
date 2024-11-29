@@ -18,7 +18,6 @@ import Data.Kind (Type)
 import GHC.TypeLits
 
 import Data.Proxy
-import Godot.Lang.Kind.General
 import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
 import Control.Lens.TH(makeLenses)
 import Control.Lens

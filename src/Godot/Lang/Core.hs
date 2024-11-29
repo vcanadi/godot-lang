@@ -23,19 +23,18 @@ import Data.Kind (Type)
 import GHC.TypeLits
 
 import Data.Proxy
-import Godot.Lang.Kind.General
 import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
 import Control.Lens.TH(makeLenses)
 import Control.Lens
 import Data.Map.Strict (Map, insertWith, fromList, toList)
 import qualified Data.Map.Strict as M
 import Control.Arrow ((>>>))
-import Data.String.Interpolate (i)
 import Data.List (intercalate, find)
 import Data.Char (toLower)
 import Data.Maybe (maybeToList, isNothing)
 import Control.Monad (join)
 
+-- | Class that defines how to represent/translate a Haskell type name to Godot type name
 class ToTyp t where
   toTyp :: Typ
 

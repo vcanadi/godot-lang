@@ -6,6 +6,11 @@ maintainer:         vito.canadi@gmail.com
 extra-source-files: CHANGELOG.md
 synopsis:           ---
 
+ghc-options:
+  - -Wall
+  - -Werror=redundant-constraints
+  - -Wunused-imports
+
 default-extensions:
   - LambdaCase
   - OverloadedStrings
