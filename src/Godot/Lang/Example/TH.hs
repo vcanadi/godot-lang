@@ -2,7 +2,6 @@
 
 module Godot.Lang.Example.TH where
 
-import Godot.Lang.Trans
 import Godot.Lang.Example.CliMsg
 
 main :: IO ()

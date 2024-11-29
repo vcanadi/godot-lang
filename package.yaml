@@ -9,7 +9,7 @@ synopsis:           ---
 ghc-options:
   - -Wall
   - -Werror=redundant-constraints
-  - -Wunused-imports
+  - -Werror=unused-imports
 
 default-extensions:
   - LambdaCase

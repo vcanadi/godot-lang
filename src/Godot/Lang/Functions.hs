@@ -12,19 +12,7 @@
 -}
 module Godot.Lang.Functions where
 
-import Linear.V2(V2)
-import Linear.V3(V3)
-import Data.Kind (Type)
-import GHC.TypeLits
 
-import Data.Proxy
-import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
-import Control.Lens.TH(makeLenses)
-import Control.Lens
-import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
-import qualified Data.Map.Strict as M
-import Control.Arrow ((>>>))
-import Data.List (intercalate)
 import Data.Char (toLower, chr, ord)
 import Data.Maybe (maybeToList)
 import Control.Monad (join)
@@ -97,7 +85,7 @@ addConShow dc@DefCls{..} =
         ]
     prodTypeCase =
         [StmtRet $ EStr con
-        | (EnumVal con, vs) <- _dciDefConVars _dcInn
+        | (EnumVal con, _) <- _dciDefConVars _dcInn
         ]
 
 
@@ -121,7 +109,7 @@ addEq dc@DefCls{..} =
       ]
     prodTypeCase =
       [ StmtRet $ exprClsEq vs
-      | (EnumVal con, vs) <- _dciDefConVars _dcInn
+      | (EnumVal _, vs) <- _dciDefConVars _dcInn
       ]
 
     -- | gd expression that tests equality based on selected constructor(optionally)
@@ -161,7 +149,7 @@ addSerToArr dc@DefCls{..} =
       ]
     prodTypeCase =
       [ StmtRet $ exprClsSer Nothing vs
-      | (EnumVal con, vs) <- _dciDefConVars _dcInn
+      | (EnumVal _, vs) <- _dciDefConVars _dcInn
       ]
 
     -- | gd expression that serializes class based on selected constructor(optionally)
@@ -220,48 +208,48 @@ addDesFromArr dc@DefCls{..} =
 
     -- | gd statements that deserialize class based on selected constructor
     stmtsClsDes :: Maybe String -> p -> [DefVar] -> [Stmt]
-    stmtsClsDes conMb con vs = case conMb of
+    stmtsClsDes conMb _ vs = case conMb of
       -- | No constructor (product type)
       Nothing -> case vs of
         -- | Single product argument (newtype or data)
         [DefVar (VarName vn) typ] -> stmtsValueDes "arr" ("ret." <> vn) 0 typ
         -- | Multiple product arguments
         _                         -> concat
-          [  stmtsValueDes ("arr[" <> show i <> "]") ("ret." <> vn) 0 typ
-          | (i, DefVar (VarName vn) typ) <- zip [0..] vs
+          [  stmtsValueDes ("arr[" <> show k <> "]") ("ret." <> vn) 0 typ
+          | (k, DefVar (VarName vn) typ) <- zip [(0::Int)..] vs
           ]
       -- | Multiple constructors (sum type)
-      Just con ->  concat
-          [  stmtsValueDes ("arr[" <> show i <> "]") ("ret." <> vn) 0 typ
-          | (i, DefVar (VarName vn) typ) <- zip [1..] vs
+      Just _ ->  concat
+          [  stmtsValueDes ("arr[" <> show k <> "]") ("ret." <> vn) 0 typ
+          | (k, DefVar (VarName vn) typ) <- zip [(1::Int)..] vs
           ]
 
     ixVar :: String -> Int -> String
     ixVar s n = s <> ['_',chr $ ord 'A' + n]
 
     stmtsValueDes :: String -> String -> Int -> Typ -> [Stmt]
-    stmtsValueDes nmIn nmOut i typ = case typ of
+    stmtsValueDes nmIn nmOut i' typ = case typ of
       TypCls (ClsName nm) -> [ [nmOut] --= ERaw (nm <> ".desFromArr(" <> nmIn <> ")") ]
       TypArr (TypCls (ClsName nm)) -> [ StmtApp $ (nmOut <> ".assign") --$ [(nmIn <> ".map") --$ [ERaw $ nm <> ".desFromArr"]]]
       TypArr (TypPair a b) -> [ StmtApp $ (nmOut <> ".assign") --$ [(nmIn <> ".map") --$ [ERaw $ showTyp (TypPair a b) <> ".desFromArr"]]]
       TypArr typ' -> [ StmtApp $ (nmOut <> ".assign") --$ [(nmIn <> ".map") --$ ["x" --> exprArrDes "x" typ']]]
-      TypDict a b -> [ ixVar "dict" i -:: TypDict a b -:= ERaw "{}"
-                     , StmtVarInit (ixVar "k" i -:: a) Nothing
-                     , StmtVarInit (ixVar "v" i -:: b) Nothing
-                     , StmtFor (VarName $ ixVar "pair" i) (ERangeVar $ VarName nmIn) $
-                            stmtsValueDes (ixVar "pair" i <> "[0]") (ixVar "k" i) (succ i) a
-                         <> stmtsValueDes (ixVar "pair" i <> "[1]") (ixVar "v" i) (succ i) b
-                         <> [ [ixVar "dict" i <> "["<> ixVar "k" i <> "]"] --= ERaw (ixVar "v" i)
+      TypDict a b -> [ ixVar "dict" i' -:: TypDict a b -:= ERaw "{}"
+                     , StmtVarInit (ixVar "k" i' -:: a) Nothing
+                     , StmtVarInit (ixVar "v" i' -:: b) Nothing
+                     , StmtFor (VarName $ ixVar "pair" i') (ERangeVar $ VarName nmIn) $
+                            stmtsValueDes (ixVar "pair" i' <> "[0]") (ixVar "k" i') (succ i') a
+                         <> stmtsValueDes (ixVar "pair" i' <> "[1]") (ixVar "v" i') (succ i') b
+                         <> [ [ixVar "dict" i' <> "["<> ixVar "k" i' <> "]"] --= ERaw (ixVar "v" i')
                          ]
-                     , [nmOut] --= ERaw (ixVar "dict" i)
+                     , [nmOut] --= ERaw (ixVar "dict" i')
                      ]
-      TypPair a b -> [ [nmOut] --= ERaw ("arr[" <> show i <> "]") ]
+      TypPair _ _ -> [ [nmOut] --= ERaw ("arr[" <> show i' <> "]") ]
       TypEnum _   -> [ [nmOut] --= ERaw nmIn ]
       __          -> [ [nmOut] --= ERaw nmIn ]
 
     -- | gd expression that deserializes arrays
     exprArrDes nm (TypArr t')           = (nm <> ".map") --$ ["x" --> exprArrDes "x" t']
-    exprArrDes nm (TypCls (ClsName cn)) = ERaw "desFromArr"
+    exprArrDes _  (TypCls (ClsName _))  = ERaw "desFromArr"
     exprArrDes nm (TypPair a b)         = ERaw $ showTyp (TypPair a b) <> ".desFromArr(" <> nm <> ")"
     exprArrDes nm _                     = ERaw nm
 
@@ -270,7 +258,7 @@ addDesFromArr dc@DefCls{..} =
 
 -- | Enrich DefCls with binary serialization function compatible with godot-ser serialization
 addSerToBin :: DefCls -> [DefFunc]
-addSerToBin dc@DefCls{..} =
+addSerToBin DefCls{..} =
   [ "Serialize to binary" ###
     stat_func "ser" ["this" -:: TypCls _dcName] (TypPrim PTByteArr)
      [StmtRet $ ERaw "var_to_bytes(serToArr(this))"]
@@ -278,7 +266,7 @@ addSerToBin dc@DefCls{..} =
 
 -- | Enrich DefCls with binary deserialization function compatible with godot-ser serialization
 addDesFromBin :: DefCls -> [DefFunc]
-addDesFromBin dc@DefCls{..} =
+addDesFromBin DefCls{..} =
   [ "Deserialize from binary" ###
     stat_func "des" ["this" -:: TypPrim PTByteArr] (TypCls _dcName)
       [StmtRet $ ERaw "desFromArr(bytes_to_var(this))"]

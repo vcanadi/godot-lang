@@ -12,24 +12,16 @@
 -}
 module Godot.Lang.Trans where
 
-import Linear.V2(V2)
-import Linear.V3(V3)
 import Data.Kind (Type)
-import GHC.TypeLits
 
 import Data.Proxy
-import GHC.Generics (M1 (..), (:+:) (..), (:*:) ((:*:)), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1, K1, D1, Datatype (datatypeName), Constructor (conName), Selector (selName))
-import Control.Lens.TH(makeLenses)
-import Control.Lens
-import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
+import GHC.Generics ((:+:) (..), Generic (Rep), C1, S1, Rec0, U1, D1, Constructor (conName), Selector (selName), (:*:))
 import Control.Arrow ((>>>))
-import Data.String.Interpolate (i)
 import Data.List (intercalate)
 import Godot.Lang.Core
 import Godot.Lang.Functions
 import Godot.Lang.Format
-import Language.Haskell.TH (Q, Exp, runIO)
-import Data.Typeable (typeRep, Typeable, TypeRep)
+import Data.Typeable (typeRep, Typeable)
 import Godot.Lang.Util
 
 -- Translation from Haskell type into Godot class

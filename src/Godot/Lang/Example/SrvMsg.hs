@@ -3,12 +3,9 @@
 module Godot.Lang.Example.SrvMsg where
 
 import Godot.Lang.Trans
-import Linear.V2 (V2)
 import Data.Map (Map)
 import GHC.Generics (Generic)
 import Language.Haskell.TH (Q, Exp, runIO)
-import Godot.Lang.Core (ToTyp (toTyp), Typ (TypPrim), PrimTyp (PTString))
-import Data.Word (Word16)
 
 type PortNumber = Int
 type HostAddress = Int

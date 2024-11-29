@@ -19,20 +19,13 @@ module Godot.Lang.Core where
 
 import Linear.V2(V2)
 import Linear.V3(V3)
-import Data.Kind (Type)
-import GHC.TypeLits
 
-import Data.Proxy
-import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
-import Control.Lens.TH(makeLenses)
 import Control.Lens
-import Data.Map.Strict (Map, insertWith, fromList, toList)
+import Data.Map.Strict (Map, insertWith)
 import qualified Data.Map.Strict as M
 import Control.Arrow ((>>>))
-import Data.List (intercalate, find)
-import Data.Char (toLower)
-import Data.Maybe (maybeToList, isNothing)
-import Control.Monad (join)
+import Data.List (find)
+import Data.Maybe (isNothing)
 
 -- | Class that defines how to represent/translate a Haskell type name to Godot type name
 class ToTyp t where
@@ -144,8 +137,8 @@ pairName = f 0
     f _ (TypPrim PTV3     )   = "Vector3"
     f _ (TypPrim PTByteArr)   = "PackedByteArray"
     f i (TypArr t)            = "A_" <> f (succ i) t <> "_A"
-    f i (TypPair t t')        = "P_" <> f (succ i) t <> "_"  <> f (succ i) t' <> "_P"
-    f i (TypDict t t')        = "D_" <> f (succ i) t <> "_D"
+    f i (TypPair t t')        = "P_" <> f (succ i) t <> "_" <> f (succ i) t' <> "_P"
+    f i (TypDict t t')        = "D_" <> f (succ i) t <> "_" <> f (succ i) t' <> "_D"
     f _ (TypCls (ClsName nm)) = nm
     f _ (TypEnum enm) = enm
     f _ TypAny  = "Variant"
@@ -192,7 +185,7 @@ stat_func :: String -> [DefVar] -> Typ -> [Stmt] -> DefFunc
 stat_func fn args typ = DefFunc True Nothing (FuncName fn) args typ []
 
 (###) :: String -> DefFunc -> DefFunc
-comment ### func = func { _dfComment = Just comment }
+comment ### f = f { _dfComment = Just comment }
 
 data Stmt where
   StmtApp :: Expr App -> Stmt
@@ -244,7 +237,10 @@ data Expr t where
   EId :: Iden -> Expr t -- ^ Identifier
 deriving instance Show (Expr t)
 
+(-->) :: String -> Expr t -> Expr Lam
 (-->) vn = ELam [VarName vn]
+
+(--$) :: String -> [Expr t] -> Expr t'
 (--$) fn = EApp (FuncName fn)
 
 -- | Main type describing godot class, inner information about class
@@ -378,6 +374,8 @@ a -|| b = EOr [a, b]
 
 
 -- | Shortcut for some constructor constant "Con.<con>: Con"
+eCon :: String -> Expr t
 eCon con = EId $ Iden ["Con",con]
 
+eId :: [String] -> Expr t
 eId is = EId $ Iden is

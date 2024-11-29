@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -17,18 +16,8 @@
 module Godot.Lang.Format where
 
 import Godot.Lang.Core
-import Linear.V2(V2)
-import Linear.V3(V3)
-import Data.Kind (Type)
-import GHC.TypeLits
 
-import Data.Proxy
-import GHC.Generics (M1 (..), (:+:), (:*:), Generic (from, Rep), Meta (..), D, C, C1, S1, Rec0, U1)
-import Control.Lens.TH(makeLenses)
-import Control.Lens
-import Data.Map.Strict (Map, insertWith, fromList, unionWith, toList)
-import qualified Data.Map.Strict as M
-import Control.Arrow ((>>>))
+import Data.Map.Strict (toList)
 import Data.String.Interpolate (i)
 import Data.List (intercalate)
 import Data.Bool(bool)
@@ -77,17 +66,19 @@ fmtDefVar v = [i|var #{fmtVar v}|]
 fmtVar :: DefVar -> String
 fmtVar (DefVar nm typ ) = [i|#{fmtVarName nm}: #{fmtTyp typ}|]
 
+fmtVarName :: VarName -> String
 fmtVarName (VarName nm) = nm
 
 fmtDefFunc :: DefFunc -> String
-fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp vars stmts)
+fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp _ stmts)
   = [i|# #{fromMaybe "TODO: Add comment" comm}
 #{bool "" "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
 #{addIndent $ breakLines $ fmtStmt <$> stmts}|]
 
+fmtStmt :: Stmt -> String
 fmtStmt (StmtApp e) = fmtExpr e
 fmtStmt (StmtIf e s) = [i|if #{fmtExpr e}: #{fmtStmt s} |]
-fmtStmt (StmtIfElse e s s') = [i|if #{fmtExpr e}: #{fmtStmt s} else: #{fmtStmt s} |]
+fmtStmt (StmtIfElse e s s') = [i|if #{fmtExpr e}: #{fmtStmt s} else: #{fmtStmt s'} |]
 fmtStmt (StmtFor v l s) = [i|
 for #{fmtVarName v} in #{fmtExpr l}:
 #{addIndent $ unlines $ fmtStmt <$> s} |]

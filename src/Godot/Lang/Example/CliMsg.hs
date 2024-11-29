@@ -3,8 +3,6 @@
 module Godot.Lang.Example.CliMsg where
 
 import Godot.Lang.Trans
-import Linear.V2 (V2)
-import Data.Map (Map)
 import GHC.Generics (Generic)
 import Language.Haskell.TH (Q, Exp, runIO)
 
