@@ -28,7 +28,7 @@ import Godot.Lang.Functions
 import Godot.Lang.Format
 import Language.Haskell.TH (Q, Exp, runIO)
 import Godot.Lang.Kind.General
-import Data.Typeable (typeRep, Typeable)
+import Data.Typeable (typeRep, Typeable, TypeRep)
 
 -- Helpers
 --
@@ -43,21 +43,6 @@ instance                 MW U1            where mW _ = 0
 -- | Dummy type used for GHC.Generic functions (datatype|con|sel)Name
 data Dmy (t :: Meta) (c :: Type -> Type) f = Dmy
 
--- | To those type names its parameter is appended e.g. Maybe Int --> MaybeInt
-isCommonType :: String -> Bool
-isCommonType = (`elem` ["Maybe", "Either"])
-
--- | Name of the type
--- for custom types, name a type as haskell type, for common types e.g. Maybe, find type parameter e.g. MaybeDir, MaybeInt, EitherBoolString
-class Name (f :: * -> *)                       where name :: Proxy f -> String
-instance (Datatype m, Name f) => Name (D1 m f) where name _ =  if isCommonType (datatypeName @m Dmy) then datatypeName @m Dmy <> name (Proxy @f) else datatypeName @m Dmy
-instance (Name f, Name g) => Name (f :+: g)    where name _ = name (Proxy @f) <> name (Proxy @g)
-instance (Name f, Name g) => Name (f :*: g)    where name _ = name (Proxy @f) <> name (Proxy @g)
-instance Name f => Name (C1 m f)               where name _ = name (Proxy @f)
-instance Typeable f => Name (S1 m (Rec0 f))    where name _ = show (typeRep (Proxy @f))
-instance Name (K1 i c)                         where name _ = ""
-instance Name U1                               where name _ = ""
-
 -- Translation from Haskell type into Godot class
 
 -- | Add specific constructor to Con enum
@@ -67,37 +52,40 @@ addCon  = addToConEnum
 -- Generic generation of godot class from haskell type
 --
 -- | Generate GD script of a class for a corresponging type
-genGDScript :: forall a. (GDC (Rep a)) => FilePath -> IO ()
+genGDScript :: forall a. (GDC (Rep a), Typeable a) => FilePath -> IO ()
 genGDScript dir =  writeFile (dir <> "/" <> cnName (_dcName dc) <> ".gd") $ fmtDefCls dc
     where
-      dc = addBasicFunctions $ genDefCls @a
+      dc = addBasicFunctions $ genDC @a
 
 -- | Generate GD script of classes for a corresponging type list
-genGDScript' :: forall as. (GDCs (FmapRep as)) => FilePath -> IO ()
+genGDScript' :: forall as. (GenDCs as) => FilePath -> IO ()
 genGDScript' dir =  writeFile (dir <> "/common.gd" ) $ intercalate "\n\n" $ fmtDefCls <$> dcs
     where
-      dcs = addBasicFunctions <$> genDefCls' @as
+      dcs = addBasicFunctions <$> genDCs (Proxy @as)
 
--- | Wrapper function. For a type with GCD instance on its representation, build DefCls generically
-genDefCls :: forall a. (GDC (Rep a)) => DefCls
-genDefCls = gDC $ Proxy @(Rep a)
 
 type family FmapRep as where
   FmapRep '[]           = '[]
   FmapRep (a ': as) =  Rep a ': FmapRep as
 
--- | For a list of types with GCD instances on their representation, build DefCls' generically
-genDefCls' :: forall as. (GDCs (FmapRep as)) => [DefCls]
-genDefCls' = gDCs $ Proxy @(FmapRep as)
+-- | Apply genDC on multiple types
+class GenDCs (as :: [Type])                                       where genDCs :: Proxy as -> [DefCls]
+instance                                         GenDCs '[]       where genDCs _ = []
+instance (GDC (Rep a), GenDCs as, Typeable a) => GenDCs (a ': as) where genDCs _ = genDC @a : genDCs (Proxy @as)
 
--- | Typeclass plural of GDC that works on a type level list
-class GDCs (fs :: [Type -> Type])           where gDCs :: Proxy fs -> [DefCls]
-instance                     GDCs '[]       where gDCs _ = []
-instance (GDC f, GDCs fs) => GDCs (f ': fs) where gDCs _ = gDC (Proxy @f) : gDCs (Proxy @fs)
+-- | Wrapper function to work on type 'a', not the representation.
+-- For a type with GCD instance on its representation, build DefCls generically
+genDC :: forall a. (GDC (Rep a), Typeable a) => DefCls
+genDC = gDC (typeName @a) $ Proxy @(Rep a)
+
+typeName :: forall a. Typeable a => String
+typeName = concat $ words $ show $ typeRep (Proxy @a)
+
+-- Work on generic representation
 
 -- | Typeclass "GenericDefCls" whose instances (generic representations) know how to render themself into DefCls
-class GDC (f :: Type -> Type)                     where gDC :: Proxy f -> DefCls
-instance (GDCIΣ f, Name (D1 m f)) => GDC (D1 m f) where gDC _  = DefCls (ClsName $ name (Proxy @(D1 m f))) ExtendsObject $ gDCIΣ (Proxy @f) mempty
+class GDC (f :: Type -> Type)    where gDC :: String -> Proxy f -> DefCls
+instance GDCIΣ f => GDC (D1 m f) where gDC tNm _  = DefCls (ClsName tNm) ExtendsObject $ gDCIΣ (Proxy @f) mempty
 
 -- | "GenericDefCls" logic on generic sum type
 class GDCIΣ (f :: Type -> Type)                      where gDCIΣ :: Proxy f -> DefClsInn -> DefClsInn
@@ -113,16 +101,14 @@ instance                             GDCIπ U1              where gDCIπ _ _ = c
 -- Generic represenation of a type name/label
 --
 -- | Wrapper function. For a type with GToTyp instance on its representation, show its type name/label
-genToTyp :: forall a . (GToTyp (Rep a)) => Typ
-genToTyp = gToTyp (Proxy @(Rep a))
+genToTyp :: forall a . (GToTyp (Rep a)) => String -> Typ
+genToTyp s = gToTyp s (Proxy @(Rep a))
 
 -- | Typeclass whose instances (generic representations) know their type name/label
-class GToTyp (f :: Type -> Type)                                    where gToTyp :: Proxy f -> Typ
-instance {-# OVERLAPPABLE #-} (Datatype m, MW f) => GToTyp (D1 m f) where gToTyp _  = if mW (Proxy @f) == 0
-                                                                                      then TypEnum  $ datatypeName @m Dmy
-                                                                                      else TypCls $ ClsName $ datatypeName @m Dmy
+class GToTyp (f :: Type -> Type)                        where gToTyp :: String -> Proxy f -> Typ
+instance {-# OVERLAPPABLE #-} (MW f) => GToTyp (D1 m f) where gToTyp tNm _  = (if mW (Proxy @f) == 0 then TypEnum else TypCls . ClsName) tNm
 
 -- | For any type with Generic instance, default to gToTyp as type name/label
-instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a
+instance {-# OVERLAPPABLE #-} (GToTyp (Rep a), Typeable a) => ToTyp a where toTyp = genToTyp @a (typeName @a)
 
 
