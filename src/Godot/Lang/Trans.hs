@@ -40,11 +40,23 @@ instance                 MW (K1 i c)      where mW _ = 1
 instance MW f         => MW (M1 i t f)    where mW _ = mW (Proxy @f)
 instance                 MW U1            where mW _ = 0
 
-data Dummy (t :: Meta) (c :: Type -> Type) f = Dummy
+-- | Dummy type used for GHC.Generic functions (datatype|con|sel)Name
+data Dmy (t :: Meta) (c :: Type -> Type) f = Dmy
+
+-- | To those type names its parameter is appended e.g. Maybe Int --> MaybeInt
+isCommonType :: String -> Bool
+isCommonType = (`elem` ["Maybe", "Either"])
 
 -- | Name of the type
-class Name (f :: * -> *)               where name :: Proxy f -> String
-instance (Datatype m) => Name (D1 m f) where name _ =  datatypeName @m Dummy
+-- for custom types, name a type as haskell type, for common types e.g. Maybe, find type parameter e.g. MaybeDir, MaybeInt, EitherBoolString
+class Name (f :: * -> *)                       where name :: Proxy f -> String
+instance (Datatype m, Name f) => Name (D1 m f) where name _ =  if isCommonType (datatypeName @m Dmy) then datatypeName @m Dmy <> name (Proxy @f) else datatypeName @m Dmy
+instance (Name f, Name g) => Name (f :+: g)    where name _ = name (Proxy @f) <> name (Proxy @g)
+instance (Name f, Name g) => Name (f :*: g)    where name _ = name (Proxy @f) <> name (Proxy @g)
+instance Name f => Name (C1 m f)               where name _ = name (Proxy @f)
+instance Typeable f => Name (S1 m (Rec0 f))    where name _ = show (typeRep (Proxy @f))
+instance Name (K1 i c)                         where name _ = ""
+instance Name U1                               where name _ = ""
 
 -- Translation from Haskell type into Godot class
 
@@ -90,12 +102,12 @@ instance (GDCIΣ f, Name (D1 m f)) => GDC (D1 m f) where gDC _  = DefCls (ClsNam
 -- | "GenericDefCls" logic on generic sum type
 class GDCIΣ (f :: Type -> Type)                      where gDCIΣ :: Proxy f -> DefClsInn -> DefClsInn
 instance (GDCIΣ f, GDCIΣ g)       => GDCIΣ (f :+: g) where gDCIΣ _ = gDCIΣ (Proxy @f) >>> gDCIΣ (Proxy @g)
-instance (GDCIπ f, Constructor m) => GDCIΣ (C1 m f)  where gDCIΣ _ = addToConEnum (conName @m Dummy) >>> gDCIπ 0 (Proxy @f) (EnumVal (conName @m Dummy))
+instance (GDCIπ f, Constructor m) => GDCIΣ (C1 m f)  where gDCIΣ _ = addToConEnum (conName @m Dmy) >>> gDCIπ 0 (Proxy @f) (EnumVal (conName @m Dmy))
 
 -- | "GenericDefCls" logic on generic product type
 class GDCIπ (f :: Type -> Type)                            where gDCIπ :: Int -> Proxy f -> EnumVal -> DefClsInn -> DefClsInn
 instance (GDCIπ f, GDCIπ g, MW f) => GDCIπ (f :*: g)       where gDCIπ i _ = (>>>) <$> gDCIπ i (Proxy @f) <*> gDCIπ (i + mW (Proxy @f)) (Proxy @g)
-instance (ToTyp f, Selector m)    => GDCIπ (S1 m (Rec0 f)) where gDCIπ i _ = case selName @m Dummy of "" -> addConDefVar i (toTyp @f); nm  -> addRecDefVar nm (toTyp @f)
+instance (ToTyp f, Selector m)    => GDCIπ (S1 m (Rec0 f)) where gDCIπ i _ = case selName @m Dmy of "" -> addConDefVar i (toTyp @f); nm  -> addRecDefVar nm (toTyp @f)
 instance                             GDCIπ U1              where gDCIπ _ _ = const id
 
 -- Generic represenation of a type name/label
@@ -107,8 +119,8 @@ genToTyp = gToTyp (Proxy @(Rep a))
 -- | Typeclass whose instances (generic representations) know their type name/label
 class GToTyp (f :: Type -> Type)                                    where gToTyp :: Proxy f -> Typ
 instance {-# OVERLAPPABLE #-} (Datatype m, MW f) => GToTyp (D1 m f) where gToTyp _  = if mW (Proxy @f) == 0
-                                                                                      then TypEnum  $ datatypeName @m Dummy
-                                                                                      else TypCls $ ClsName $ datatypeName @m Dummy
+                                                                                      then TypEnum  $ datatypeName @m Dmy
+                                                                                      else TypCls $ ClsName $ datatypeName @m Dmy
 
 -- | For any type with Generic instance, default to gToTyp as type name/label
 instance {-# OVERLAPPABLE #-} GToTyp (Rep a) => ToTyp a where toTyp = genToTyp @a

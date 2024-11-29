@@ -94,7 +94,9 @@ for #{fmtVarName v} in #{fmtExpr l}:
 #{addIndent $ unlines $ fmtStmt <$> s} |]
 fmtStmt (StmtMatch e (css, othMb))
   = [i|match #{fmtExpr e}:
-|] <> addIndent (concatMap (\(e',ss) -> [i|#{fmtExpr e'}: #{unlines (addIndent . fmtStmt  <$> ss)}|]) css)
+|] <> addIndent (concatMap (\(e',ss) ->
+  [i|#{fmtExpr e'}:
+#{unlines (addIndent . fmtStmt  <$> ss)}|]) css)
    <> addIndent (maybe "" (\oth -> [i|_:#{unlines (addIndent . fmtStmt <$> oth)}|]) othMb)
 
 

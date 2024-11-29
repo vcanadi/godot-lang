@@ -309,13 +309,15 @@ addToConEnum v = dciDefConVars %~ (<> [(EnumVal v, [])])
 -- | Add a variable definition that holds some sum type constructor's record value
 -- Additionally construct class inner type in case that is wanted (e.g. if type is a TypPair (helper type collection mimicing type variables))
 addRecDefVar :: String -> Typ -> EnumVal -> DefClsInn -> DefClsInn
-addRecDefVar fld typ con = (dciDefConVars %~ insertWithL (flip (<>)) con [fld -:: typ ])
-                     . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
+addRecDefVar fld typ con = (dciDefConVars %~ insertWithL ((<>)) con [fld -:: typ ])
+                         . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
 
 -- | Add a variable definition that holds some sum type constructor's unnamed value
 addConDefVar :: Int -> Typ -> EnumVal -> DefClsInn -> DefClsInn
 addConDefVar i typ con = (dciDefConVars %~ insertWithL (flip (<>)) con [("fld_" <> evVal con <> "_" <> show i) -:: typ])
-                       . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b; _ -> id)
+                       . (case typ of (TypArr (TypPair a b)) -> addTypPairCls a b
+                                      (TypPair a b) -> addTypPairCls a b
+                                      _ -> id)
 
 addTypPairCls :: Typ -> Typ -> DefClsInn -> DefClsInn
 addTypPairCls a b = dciDefClasses %~ (mkTypPairCls:)

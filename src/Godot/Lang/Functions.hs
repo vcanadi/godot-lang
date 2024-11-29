@@ -62,11 +62,15 @@ addBasicFunctions = bool
                   . addFuncsRecursive addEq
                 <*> not . isEnum
 
+low :: String -> String
+low [] = []
+low (c:cs) = toLower c : cs
+
 -- | Enrich DefCls with "constructor" functions for each constructor in sum type
 addCons :: DefCls -> [DefFunc]
 addCons dc@DefCls{..} =
   [ [i|Constructor function for sum constructor #{con}|] ###
-    stat_func (toLower <$> con) (join $ maybeToList $ lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName )
+    stat_func con (join $ maybeToList $ lookup (EnumVal con) $ _dciDefConVars _dcInn) (TypCls _dcName )
       ( [ ("ret" -:: TypCls _dcName) -:= ERaw (cnName _dcName <> ".new()") ] <>
         [ ["ret", "con"] --= eCon con  | isSumType dc] <>
         [ ["ret",  vn] --= ERaw vn
