@@ -18,6 +18,8 @@ import Godot.Lang.Class (ToDefCls)
 
 data Dir = L | R | U | D deriving (Show, Eq, Generic, Enum, Bounded, Read)
 
+instance ToDefCls Dir
+
 data CliMsg
   = JOIN
   | LEAVE

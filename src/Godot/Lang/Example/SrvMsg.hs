@@ -20,6 +20,8 @@ data SockAddr
   | SockAddrDummy
   deriving (Eq, Ord, Show, Generic)
 
+instance ToDefCls SockAddr
+
 data SrvMsg = PUT_STATE { model :: Model }
   deriving (Show, Eq, Generic)
 
@@ -33,3 +35,4 @@ data Loc = Loc
   , _mY :: Int
   } deriving (Show, Eq, Generic)
 
+instance ToDefCls Loc
