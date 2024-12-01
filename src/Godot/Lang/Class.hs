@@ -14,9 +14,14 @@ import GHC.Base (Type)
 
 -- | Class used for flagging which type gets converted to corresponding godot type
 class ToDefCls a where
+   -- | DefCls type that corresponds with type 'a' with ToDefCls instance
    toDC :: Proxy a -> DefCls
    default toDC :: (GDC (Rep a), Typeable a) => Proxy a -> DefCls
    toDC _ = genDC @a
+   extraStatVars :: Proxy a -> [DefVar]
+   default extraStatVars :: Proxy a -> [DefVar]
+   extraStatVars _ = []
+
 
 -- TODO: Below type families are still unused.
 -- This will be used to recursivelly make DefCls conversion for types that are part of a type with ToDefCls instance

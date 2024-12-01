@@ -4,7 +4,8 @@ module Godot.Lang.Example.SrvMsg where
 
 import Data.Map (Map)
 import GHC.Generics (Generic)
-import Godot.Lang.Class (ToDefCls)
+import Godot.Lang.Class (ToDefCls(extraStatVars))
+import Godot.Lang.Core
 
 type PortNumber = Int
 type HostAddress = Int
@@ -35,4 +36,7 @@ data Loc = Loc
   , _mY :: Int
   } deriving (Show, Eq, Generic)
 
-instance ToDefCls Loc
+instance ToDefCls Loc where
+  extraStatVars _ = [ "m" -:: TypPrim PTInt
+                    , "n" -:: TypPrim PTInt
+                    ]
