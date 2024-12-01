@@ -197,6 +197,7 @@ data Stmt where
   StmtRet :: Expr r -> Stmt
   StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
   StmtSet :: Iden -> Expr t -> Stmt
+  StmtRaw :: String -> Stmt
 deriving instance Show Stmt
 
 -- | Type used for flaging godot expression acceptable for for loop

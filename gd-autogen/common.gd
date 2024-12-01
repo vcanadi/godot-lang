@@ -6,6 +6,18 @@ class Loc extends Object:
   var _mX: int
   var _mY: int
 
+  # TODO: Add comment
+  func display() -> String:
+    
+      var s: String = ""
+      for _j in range(m-1,-1,-1):
+        for _i in range(n):
+          s += ("X" if _mX == _i and _mY == _j else " ") + "|"
+        s+="\n"
+      return s
+      
+  
+  
   #  Equality check on type: Loc 
   static func eq(a: Loc, b: Loc) -> bool:
     return a._mX==b._mX && a._mY==b._mY 
@@ -194,6 +206,18 @@ class SrvMsg extends Object:
 
   var model: Array[P_SockAddr_Loc_P]
 
+  # TODO: Add comment
+  func display() -> String:
+    
+      var s: String = ""
+      for _j in range(Loc.m-1,-1,-1):
+        for _i in range(Loc.n):
+          s += ("X" if model.any(func(ci): return ci.snd._mX == _i and ci.snd._mY == _j) else " ") + "|"
+        s+="\n"
+      return s
+      
+  
+  
   #  Equality check on type: SrvMsg 
   static func eq(a: SrvMsg, b: SrvMsg) -> bool:
     return a.model.reduce(func(acc,x): return [ acc[0] && P_SockAddr_Loc_P.eq(x, b.model[acc[1]]), acc[1] + 1 ] , [true, 0])[0] 

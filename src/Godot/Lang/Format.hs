@@ -99,6 +99,7 @@ fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
 fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
 fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
 fmtStmt (StmtSet (Iden id') e) = [i|#{intercalate "." id'} = #{fmtExpr e}|]
+fmtStmt (StmtRaw s) = s
 
 fmtExprElem :: ExprElem -> String
 fmtExprElem (EElem e) = fmtExpr e

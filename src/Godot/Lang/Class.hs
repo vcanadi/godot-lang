@@ -19,18 +19,25 @@ import Godot.Lang.Functions (addBasicFunctions)
 import Data.List (intercalate)
 import Godot.Lang.Format (fmtDefCls)
 
--- | Class used for flagging which type gets converted to corresponding godot type
+-- | Class used for marking which type gets converted to corresponding godot type and adds additional functions and variables
 class ToDC a where
    -- | DefCls type that corresponds with type 'a' with ToDC instance
    toDC :: Proxy a -> DefCls
    default toDC :: (GDC (Rep a), Typeable a) => Proxy a -> DefCls
    toDC _ = genDC @a
+
    extraStatVars :: Proxy a -> [DefVar]
    default extraStatVars :: Proxy a -> [DefVar]
    extraStatVars _ = []
 
+   extraFuncs :: Proxy a -> [DefFunc]
+   default extraFuncs :: Proxy a -> [DefFunc]
+   extraFuncs _ = []
+
 toDCExtra :: ToDC a => Proxy a -> DefCls
 toDCExtra p = toDC p & dcInn . dciDefStatVars %~ (<> extraStatVars p)
+                     & dcInn . dciDefFuncs %~ (<> extraFuncs p)
+
 
 -- | Apply toDCExtra on multiple types
 class ToDCsExtra (as :: [Type])                          where toDCsExtra :: Proxy as -> [DefCls]
