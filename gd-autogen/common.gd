@@ -1,5 +1,8 @@
 class Loc extends Object:
 
+  static var m: int
+  static var n: int
+
   var _mX: int
   var _mY: int
 
@@ -54,6 +57,7 @@ class SockAddr extends Object:
   enum Con { SockAddrInet, SockAddrDummy }
 
   var con: Con
+
 
   var port: int
   var host: int
@@ -138,6 +142,7 @@ class SrvMsg extends Object:
 
   class P_SockAddr_Loc_P extends Object:
   
+  
     var fst: SockAddr
     var snd: Loc
   
@@ -185,6 +190,7 @@ class SrvMsg extends Object:
     # Serialize to array
     static func serToArr(this: P_SockAddr_Loc_P) -> Array[Variant]:
       return [ SockAddr.serToArr(this.fst), Loc.serToArr(this.snd) ]  
+
 
   var model: Array[P_SockAddr_Loc_P]
 
@@ -237,6 +243,7 @@ class CliMsg extends Object:
   enum Con { JOIN, LEAVE, MOVE, GET_STATE }
 
   var con: Con
+
 
   var fld_MOVE_0: Dir
 
@@ -346,6 +353,7 @@ class MaybeDir extends Object:
   enum Con { Nothing, Just }
 
   var con: Con
+
 
   var fld_Just_0: Dir
 

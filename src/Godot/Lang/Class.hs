@@ -1,4 +1,7 @@
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -7,14 +10,18 @@ module Godot.Lang.Class where
 
 import Godot.Lang.Core
 import Godot.Lang.Trans
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy(Proxy))
 import GHC.Generics (Generic(Rep), D1, (:+:), C1, (:*:), S1, Rec0, U1)
 import Data.Typeable (Typeable)
 import GHC.Base (Type)
+import Control.Lens ((&), (%~))
+import Godot.Lang.Functions (addBasicFunctions)
+import Data.List (intercalate)
+import Godot.Lang.Format (fmtDefCls)
 
 -- | Class used for flagging which type gets converted to corresponding godot type
-class ToDefCls a where
-   -- | DefCls type that corresponds with type 'a' with ToDefCls instance
+class ToDC a where
+   -- | DefCls type that corresponds with type 'a' with ToDC instance
    toDC :: Proxy a -> DefCls
    default toDC :: (GDC (Rep a), Typeable a) => Proxy a -> DefCls
    toDC _ = genDC @a
@@ -22,10 +29,23 @@ class ToDefCls a where
    default extraStatVars :: Proxy a -> [DefVar]
    extraStatVars _ = []
 
+toDCExtra :: ToDC a => Proxy a -> DefCls
+toDCExtra p = toDC p & dcInn . dciDefStatVars %~ (<> extraStatVars p)
+
+-- | Apply toDCExtra on multiple types
+class ToDCsExtra (as :: [Type])                          where toDCsExtra :: Proxy as -> [DefCls]
+instance                            ToDCsExtra '[]       where toDCsExtra _ = []
+instance (ToDC a, ToDCsExtra as) => ToDCsExtra (a ': as) where toDCsExtra _ = toDCExtra (Proxy @a) : toDCsExtra (Proxy @as)
+
+-- | Generate GD script of classes for a corresponging type list
+toGDScriptExtra :: forall as. (ToDCsExtra as) => FilePath -> Proxy as -> IO ()
+toGDScriptExtra dir _ =  writeFile (dir <> "/common.gd" ) $ intercalate "\n\n" $ fmtDefCls <$> dcs
+    where
+      dcs = addBasicFunctions <$> toDCsExtra (Proxy @as)
 
 -- TODO: Below type families are still unused.
--- This will be used to recursivelly make DefCls conversion for types that are part of a type with ToDefCls instance
--- instead of adding ToDefCls instance manually to each type
+-- This will be used to recursivelly make DefCls conversion for types that are part of a type with ToDC instance
+-- instead of adding ToDC instance manually to each type
 
 -- | Type level list concatenation
 type family LCat (as :: [k]) (bs :: [k]) :: [k] where

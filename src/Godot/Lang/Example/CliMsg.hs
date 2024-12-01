@@ -2,7 +2,7 @@
 module Godot.Lang.Example.CliMsg where
 
 import GHC.Generics (Generic)
-import Godot.Lang.Class (ToDefCls)
+import Godot.Lang.Class (ToDC)
 
 -- data CliMsg
 --   = JOIN
@@ -18,7 +18,7 @@ import Godot.Lang.Class (ToDefCls)
 
 data Dir = L | R | U | D deriving (Show, Eq, Generic, Enum, Bounded, Read)
 
-instance ToDefCls Dir
+instance ToDC Dir
 
 data CliMsg
   = JOIN
@@ -27,4 +27,4 @@ data CliMsg
   | GET_STATE
   deriving (Show, Eq, Read, Generic)
 
-instance ToDefCls CliMsg
+instance ToDC CliMsg
