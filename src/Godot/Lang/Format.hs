@@ -68,7 +68,8 @@ fmtDefVar :: DefVar -> String
 fmtDefVar v = [i|var #{fmtVar v}|]
 
 fmtVar :: DefVar -> String
-fmtVar (DefVar nm typ ) = [i|#{fmtVarName nm}: #{fmtTyp typ}|]
+fmtVar (DefVar nm typ Nothing) = [i|#{fmtVarName nm}: #{fmtTyp typ}|]
+fmtVar (DefVar nm typ (Just rawVal)) = [i|#{fmtVarName nm}: #{fmtTyp typ} = #{rawVal}|]
 
 fmtVarName :: VarName -> String
 fmtVarName (VarName nm) = nm

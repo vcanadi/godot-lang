@@ -158,11 +158,13 @@ newtype Script = Script
 data DefVar = DefVar
   { varName :: VarName
   , varType :: Typ
+  , varInit :: Maybe String -- ^ TODO: For simplicity, it's just raw expression for now
   } deriving (Eq,Show)
+
 
 -- | Easier DefVar construction
 defVar' :: forall typ. (ToTyp typ) => String -> DefVar
-defVar' vn = DefVar (VarName vn) (toTyp @typ)
+defVar' vn = DefVar (VarName vn) (toTyp @typ) Nothing
 
 data DefFunc = DefFunc
   { _dfIsStat :: Bool
@@ -355,7 +357,7 @@ isEnum = _dcInn >>> _dciDefConVars >>> all (snd >>> null)
 
 -- | Easier DefVar construction
 (-::) :: String -> Typ -> DefVar
-(-::) = DefVar . VarName
+vn -:: ty = DefVar (VarName vn) ty Nothing
 
 -- Binary operators
 --

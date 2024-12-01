@@ -37,6 +37,6 @@ data Loc = Loc
   } deriving (Show, Eq, Generic)
 
 instance ToDC Loc where
-  extraStatVars _ = [ "m" -:: TypPrim PTInt
-                    , "n" -:: TypPrim PTInt
+  extraStatVars _ = [ DefVar (VarName "m") (TypPrim PTInt) (Just "10")
+                    , DefVar (VarName "n") (TypPrim PTInt) (Just "10")
                     ]

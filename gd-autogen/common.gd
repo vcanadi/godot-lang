@@ -1,7 +1,7 @@
 class Loc extends Object:
 
-  static var m: int
-  static var n: int
+  static var m: int = 10
+  static var n: int = 10
 
   var _mX: int
   var _mY: int
