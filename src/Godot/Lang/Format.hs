@@ -48,6 +48,7 @@ fmtDefCls dc@(DefCls (ClsName cls) ext DefClsInn{..})
   [ if null _dciDefClasses then Nothing else Just $ addIndent (breakLines $ fmap fmtDefCls _dciDefClasses  )
   , if null enums then Nothing else Just $ addIndent (breakLines $ fmap fmtEnum enums)
   , if isSumType dc then Just $ addIndent "var con: Con" else Nothing
+  , Just $ addIndent (breakLines $ fmap fmtDefStatVar _dciDefStatVars)
   , Just $ addIndent (breakLines $ fmap fmtDefVar (_dciDefVars <> concatMap snd _dciDefConVars))
   , Just $ addIndent (breakSpacedLines $ fmap fmtDefFunc _dciDefFuncs )
   ])
@@ -60,11 +61,15 @@ fmtDefCls dc@(DefCls (ClsName cls) ext DefClsInn{..})
 fmtEnum :: (String, [EnumVal]) -> String
 fmtEnum (enm, vals) = [i|enum #{enm} { #{intercalate ", " $ fmap evVal vals} }|]
 
+fmtDefStatVar :: DefVar -> String
+fmtDefStatVar v = [i|static var #{fmtVar v}|]
+
 fmtDefVar :: DefVar -> String
 fmtDefVar v = [i|var #{fmtVar v}|]
 
 fmtVar :: DefVar -> String
-fmtVar (DefVar nm typ ) = [i|#{fmtVarName nm}: #{fmtTyp typ}|]
+fmtVar (DefVar nm typ Nothing) = [i|#{fmtVarName nm}: #{fmtTyp typ}|]
+fmtVar (DefVar nm typ (Just rawVal)) = [i|#{fmtVarName nm}: #{fmtTyp typ} = #{rawVal}|]
 
 fmtVarName :: VarName -> String
 fmtVarName (VarName nm) = nm
@@ -94,6 +99,7 @@ fmtStmt (StmtRet e) = [i|return #{fmtExpr e} |]
 fmtStmt (StmtVarInit v (Just e)) = [i|#{fmtDefVar v} = #{fmtExpr e} |]
 fmtStmt (StmtVarInit v Nothing) = [i|#{fmtDefVar v}|]
 fmtStmt (StmtSet (Iden id') e) = [i|#{intercalate "." id'} = #{fmtExpr e}|]
+fmtStmt (StmtRaw s) = s
 
 fmtExprElem :: ExprElem -> String
 fmtExprElem (EElem e) = fmtExpr e

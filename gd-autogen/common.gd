@@ -1,8 +1,23 @@
 class Loc extends Object:
 
+  static var m: int = 10
+  static var n: int = 10
+
   var _mX: int
   var _mY: int
 
+  # TODO: Add comment
+  func display() -> String:
+    
+      var s: String = ""
+      for _j in range(m-1,-1,-1):
+        for _i in range(n):
+          s += ("X" if _mX == _i and _mY == _j else " ") + "|"
+        s+="\n"
+      return s
+      
+  
+  
   #  Equality check on type: Loc 
   static func eq(a: Loc, b: Loc) -> bool:
     return a._mX==b._mX && a._mY==b._mY 
@@ -54,6 +69,7 @@ class SockAddr extends Object:
   enum Con { SockAddrInet, SockAddrDummy }
 
   var con: Con
+
 
   var port: int
   var host: int
@@ -138,6 +154,7 @@ class SrvMsg extends Object:
 
   class P_SockAddr_Loc_P extends Object:
   
+  
     var fst: SockAddr
     var snd: Loc
   
@@ -186,8 +203,21 @@ class SrvMsg extends Object:
     static func serToArr(this: P_SockAddr_Loc_P) -> Array[Variant]:
       return [ SockAddr.serToArr(this.fst), Loc.serToArr(this.snd) ]  
 
+
   var model: Array[P_SockAddr_Loc_P]
 
+  # TODO: Add comment
+  func display() -> String:
+    
+      var s: String = ""
+      for _j in range(Loc.m-1,-1,-1):
+        for _i in range(Loc.n):
+          s += ("X" if model.any(func(ci): return ci.snd._mX == _i and ci.snd._mY == _j) else " ") + "|"
+        s+="\n"
+      return s
+      
+  
+  
   #  Equality check on type: SrvMsg 
   static func eq(a: SrvMsg, b: SrvMsg) -> bool:
     return a.model.reduce(func(acc,x): return [ acc[0] && P_SockAddr_Loc_P.eq(x, b.model[acc[1]]), acc[1] + 1 ] , [true, 0])[0] 
@@ -237,6 +267,7 @@ class CliMsg extends Object:
   enum Con { JOIN, LEAVE, MOVE, GET_STATE }
 
   var con: Con
+
 
   var fld_MOVE_0: Dir
 
@@ -346,6 +377,7 @@ class MaybeDir extends Object:
   enum Con { Nothing, Just }
 
   var con: Con
+
 
   var fld_Just_0: Dir
 

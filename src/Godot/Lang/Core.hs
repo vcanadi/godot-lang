@@ -158,11 +158,13 @@ newtype Script = Script
 data DefVar = DefVar
   { varName :: VarName
   , varType :: Typ
+  , varInit :: Maybe String -- ^ TODO: For simplicity, it's just raw expression for now
   } deriving (Eq,Show)
+
 
 -- | Easier DefVar construction
 defVar' :: forall typ. (ToTyp typ) => String -> DefVar
-defVar' vn = DefVar (VarName vn) (toTyp @typ)
+defVar' vn = DefVar (VarName vn) (toTyp @typ) Nothing
 
 data DefFunc = DefFunc
   { _dfIsStat :: Bool
@@ -195,6 +197,7 @@ data Stmt where
   StmtRet :: Expr r -> Stmt
   StmtVarInit :: DefVar -> Maybe (Expr t) -> Stmt
   StmtSet :: Iden -> Expr t -> Stmt
+  StmtRaw :: String -> Stmt
 deriving instance Show Stmt
 
 -- | Type used for flaging godot expression acceptable for for loop
@@ -247,6 +250,7 @@ data DefClsInn = DefClsInn
   { _dciDefEnums :: Map String [EnumVal] -- ^ Local class enums
   , _dciDefClasses :: [DefCls]
   , _dciDefConsts :: [DefVar]
+  , _dciDefStatVars :: [DefVar]
   , _dciDefConVars :: [(EnumVal, [DefVar])] -- ^ Unique enum "Con" with optional variables belonging to it
   , _dciDefVars :: [DefVar]
   , _dciDefFuncs :: [DefFunc]
@@ -276,7 +280,7 @@ insertWithL f k v xs = unionWithL f xs [(k,v)]
 
 -- | Godot's class definition without any functions, enums, variables,...
 emptyDefClsInn ::  DefClsInn
-emptyDefClsInn  = DefClsInn mempty [] [] mempty [] []
+emptyDefClsInn  = DefClsInn mempty [] [] [] mempty [] []
 
 -- | Join two DefClsInns by making a union of enums and union of its fields
 joinDefClsInn :: DefClsInn -> DefClsInn -> DefClsInn
@@ -285,6 +289,7 @@ joinDefClsInn dci0 dci1 =
     (M.unionWith (<>) (_dciDefEnums dci0) (_dciDefEnums dci1))
     (_dciDefClasses dci0 <> _dciDefClasses dci1)
     (_dciDefConsts dci0 <> _dciDefConsts dci1)
+    (_dciDefStatVars dci0 <> _dciDefStatVars dci1)
     (unionWithL (<>) (_dciDefConVars dci0) (_dciDefConVars dci1))
     (_dciDefVars dci0 <> _dciDefVars dci1)
     (_dciDefFuncs dci0 <> _dciDefFuncs dci1)
@@ -353,7 +358,7 @@ isEnum = _dcInn >>> _dciDefConVars >>> all (snd >>> null)
 
 -- | Easier DefVar construction
 (-::) :: String -> Typ -> DefVar
-(-::) = DefVar . VarName
+vn -:: ty = DefVar (VarName vn) ty Nothing
 
 -- Binary operators
 --

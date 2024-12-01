@@ -61,7 +61,7 @@ addCons dc@DefCls{..} =
       ( [ ("ret" -:: TypCls _dcName) -:= ERaw (cnName _dcName <> ".new()") ] <>
         [ ["ret", "con"] --= eCon con  | isSumType dc] <>
         [ ["ret",  vn] --= ERaw vn
-          | DefVar (VarName vn) _ <- vs
+          | DefVar (VarName vn) _ _ <- vs
         ] <>
         [ StmtRet (ERaw "ret") ]
       )
@@ -114,7 +114,7 @@ addEq dc@DefCls{..} =
 
     -- | gd expression that tests equality based on selected constructor(optionally)
     exprClsEq :: [DefVar] -> Expr Bool
-    exprClsEq vs = EAnd [ exprValueEq ("a." <> vn) ("b." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
+    exprClsEq vs = EAnd [ exprValueEq ("a." <> vn) ("b." <> vn) typ | (DefVar (VarName vn) typ _) <- vs ]
 
 
     -- | gd expression that serializes value
@@ -158,11 +158,11 @@ addSerToArr dc@DefCls{..} =
       -- | Single constructor (product type)
       Nothing -> case vs of
         -- | Single product argument (newtype or data with 1 arg)
-        [DefVar (VarName vn) typ] -> exprValueSer ("this." <> vn) typ
+        [DefVar (VarName vn) typ _] -> exprValueSer ("this." <> vn) typ
         -- | Multiple product arguments
-        _                         -> EArr [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
+        _                         -> EArr [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ _) <- vs ]
       -- | Multiple constructors (sum type)
-      Just con -> EArr $ [EElem $ eCon con] <> [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ) <- vs ]
+      Just con -> EArr $ [EElem $ eCon con] <> [ EElem $ exprValueSer ("this." <> vn) typ | (DefVar (VarName vn) typ _) <- vs ]
 
 
 
@@ -212,16 +212,16 @@ addDesFromArr dc@DefCls{..} =
       -- | No constructor (product type)
       Nothing -> case vs of
         -- | Single product argument (newtype or data)
-        [DefVar (VarName vn) typ] -> stmtsValueDes "arr" ("ret." <> vn) 0 typ
+        [DefVar (VarName vn) typ _] -> stmtsValueDes "arr" ("ret." <> vn) 0 typ
         -- | Multiple product arguments
         _                         -> concat
           [  stmtsValueDes ("arr[" <> show k <> "]") ("ret." <> vn) 0 typ
-          | (k, DefVar (VarName vn) typ) <- zip [(0::Int)..] vs
+          | (k, DefVar (VarName vn) typ _) <- zip [(0::Int)..] vs
           ]
       -- | Multiple constructors (sum type)
       Just _ ->  concat
           [  stmtsValueDes ("arr[" <> show k <> "]") ("ret." <> vn) 0 typ
-          | (k, DefVar (VarName vn) typ) <- zip [(1::Int)..] vs
+          | (k, DefVar (VarName vn) typ _) <- zip [(1::Int)..] vs
           ]
 
     ixVar :: String -> Int -> String
