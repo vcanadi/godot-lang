@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Godot.Lang.Example.TH2 where
 
@@ -14,8 +15,3 @@ import Godot.Lang.Class (ToDC)
 instance ToDC (Maybe Dir)
 
 $(allToDCInsts)
-
-
-main :: IO ()
-main = do
-    putStrLn "bla"

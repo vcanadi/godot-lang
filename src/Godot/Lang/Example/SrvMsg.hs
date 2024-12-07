@@ -7,7 +7,7 @@ import Data.Map (Map)
 import GHC.Generics (Generic)
 import Godot.Lang.Class (ToDC(extraStatVars, extraFuncs))
 import Godot.Lang.Core
-import Data.String.Interpolate (i)
+import qualified Data.String.Interpolate as SI
 
 type PortNumber = Int
 type HostAddress = Int
@@ -25,7 +25,7 @@ data SockAddr
 
 instance ToDC SockAddr
 
-data SrvMsg = PUT_STATE { model :: Model }
+newtype SrvMsg = PUT_STATE { model :: Model }
   deriving (Show, Eq, Generic)
 
 instance ToDC SrvMsg where
@@ -34,12 +34,13 @@ instance ToDC SrvMsg where
         [ StmtRaw srvMsgDisplayFuncBody ]
     ]
 
+srvMsgDisplayFuncBody :: String
 srvMsgDisplayFuncBody =
-  [i|
+  [SI.i|
   var s: String = ""
   for _j in range(Loc.m-1,-1,-1):
     for _i in range(Loc.n):
-      s += ("X" if model.any(func(ci): return ci.snd._mX == _i and ci.snd._mY == _j) else " ") + "|"
+      s += ("X" if model.any(func(ci): return ci.snd.i == _i and ci.snd.j == _j) else " ") + "|"
     s+="\\n"
   return s
   |]
@@ -48,8 +49,8 @@ srvMsgDisplayFuncBody =
 type Model = Map SockAddr Loc
 
 data Loc = Loc
-  { _mX :: Int
-  , _mY :: Int
+  { i :: Int
+  , j :: Int
   } deriving (Show, Eq, Generic)
 
 instance ToDC Loc where
@@ -61,12 +62,13 @@ instance ToDC Loc where
         [ StmtRaw locDisplayFuncBody ]
     ]
 
+locDisplayFuncBody :: String
 locDisplayFuncBody =
-  [i|
+  [SI.i|
   var s: String = ""
   for _j in range(m-1,-1,-1):
     for _i in range(n):
-      s += ("X" if _mX == _i and _mY == _j else " ") + "|"
+      s += ("X" if i == _i and j == _j else " ") + "|"
     s+="\\n"
   return s
   |]

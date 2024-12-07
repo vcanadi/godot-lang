@@ -3,8 +3,8 @@ class Loc extends Object:
   static var m: int = 10
   static var n: int = 10
 
-  var _mX: int
-  var _mY: int
+  var i: int
+  var j: int
 
   # TODO: Add comment
   func display() -> String:
@@ -12,7 +12,7 @@ class Loc extends Object:
       var s: String = ""
       for _j in range(m-1,-1,-1):
         for _i in range(n):
-          s += ("X" if _mX == _i and _mY == _j else " ") + "|"
+          s += ("X" if i == _i and j == _j else " ") + "|"
         s+="\n"
       return s
       
@@ -20,7 +20,7 @@ class Loc extends Object:
   
   #  Equality check on type: Loc 
   static func eq(a: Loc, b: Loc) -> bool:
-    return a._mX==b._mX && a._mY==b._mY 
+    return a.i==b.i && a.j==b.j 
   
   
   #  Non-static equality check of two Loc 
@@ -29,10 +29,10 @@ class Loc extends Object:
   
   
   # Constructor function for sum constructor Loc
-  static func Loc(_mX: int, _mY: int) -> Loc:
+  static func Loc(i: int, j: int) -> Loc:
     var ret: Loc = Loc.new() 
-    ret._mX = _mX
-    ret._mY = _mY
+    ret.i = i
+    ret.j = j
     return ret 
   
   
@@ -49,8 +49,8 @@ class Loc extends Object:
   # Deserialize from array
   static func desFromArr(arr: Array[Variant]) -> Loc:
     var ret: Loc = Loc.new() 
-    ret._mX = arr[0]
-    ret._mY = arr[1]
+    ret.i = arr[0]
+    ret.j = arr[1]
     return ret 
   
   
@@ -61,7 +61,7 @@ class Loc extends Object:
   
   # Serialize to array
   static func serToArr(this: Loc) -> Array[Variant]:
-    return [ this._mX, this._mY ]  
+    return [ this.i, this.j ]  
 
 
 class SockAddr extends Object:
@@ -212,7 +212,7 @@ class SrvMsg extends Object:
       var s: String = ""
       for _j in range(Loc.m-1,-1,-1):
         for _i in range(Loc.n):
-          s += ("X" if model.any(func(ci): return ci.snd._mX == _i and ci.snd._mY == _j) else " ") + "|"
+          s += ("X" if model.any(func(ci): return ci.snd.i == _i and ci.snd.j == _j) else " ") + "|"
         s+="\n"
       return s
       

@@ -179,6 +179,7 @@ addSerToArr dc@DefCls{..} =
                                                          ]
       TypEnum _    -> ERaw vn
       TypPrim _    -> ERaw vn
+      TypAny       -> ERaw "ERROR: type any serialization"
 
 -- Deserializing expressions
 --

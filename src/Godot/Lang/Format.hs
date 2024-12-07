@@ -41,7 +41,7 @@ breakSpacedLines = intercalate "\n\n"
 fmtDefCls :: DefCls -> String
 fmtDefCls dc@(DefCls (ClsName cls) ext DefClsInn{..})
   | isEnum dc = fmtEnum (cls, fst <$> _dciDefConVars)
-  | otherwise = [i|class #{cls} extends #{if ext == ExtendsObject then "Object" else "Reference"}:
+  | otherwise = [i|class #{cls} extends #{if ext == ExtendsObject then "Object" :: String else "Reference"}:
 
 |]
   <> breakLines (catMaybes
@@ -77,7 +77,7 @@ fmtVarName (VarName nm) = nm
 fmtDefFunc :: DefFunc -> String
 fmtDefFunc (DefFunc isSt comm (FuncName nm) args outTyp _ stmts)
   = [i|# #{fromMaybe "TODO: Add comment" comm}
-#{bool "" "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
+#{bool ("" :: String) "static " isSt}func #{nm}(#{fmtArgs args}) -> #{fmtTyp outTyp}:
 #{addIndent $ breakLines $ fmtStmt <$> stmts}|]
 
 fmtStmt :: Stmt -> String
