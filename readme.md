@@ -9,9 +9,9 @@ Generate corresponding Godot types(classes) from model written in Haskell. Seria
 Haskell types with `ToDC` instances are collected and a script is generated with godot classes (or enums) that correspond to the Haskell types.
 #### Generate script
 ```
-toGDScriptExtra "." (Proxy @AllToDCInsts))
+toGDScriptExtra "gd-autogen" (Proxy @AllToDCInsts))
 ```
-generates script `"common.gd"` in `"."` directory. `AllToDCInsts` is automatically generated type-level list of all types in scope with ToDC instance.
+generates script `"common.gd"` in `"gd-autogen"` directory. `AllToDCInsts` is automatically generated type-level list of all types in scope with ToDC instance.
 Execute from shell with `runhaskell -isrc src/Godot/Lang/Example/TH.hs`
 
 #### From ghci
@@ -19,7 +19,8 @@ Alternatively DefCls can be generated with functions like `genDC` from ghci
 e.g. `genDCs (Proxy @'[ CliMsg, SrvMsg, Maybe Dir  ])` generates types for CliMsg, SrvMsg and Maybe Dir types
 
 ### Examples
-More detailed usage examples can be found in Example directory and in demo project
+More detailed usage examples can be found in Example directory and in demo project.
+Try changing the model in CliMsg and run `runhaskell -isrc src/Godot/Lang/Example/TH.hs` to see the diff in `gd-autogen/common.gd`
 
 ### How it works
 

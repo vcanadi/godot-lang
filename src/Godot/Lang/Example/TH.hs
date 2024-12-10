@@ -23,4 +23,4 @@ $(qAllToDCInsts)
 
 -- | Generate gd files with runhaskell
 main :: IO ()
-main = toGDScriptExtra "." (Proxy @AllToDCInsts)
+main = toGDScriptExtra "gd-autogen" (Proxy @AllToDCInsts)
