@@ -1,0 +1,80 @@
+cabal-version: 2.2
+
+name:           godot-lang
+version:        0.1.0.0
+synopsis:       Generation of Godot classes from Haskell types
+author:         Vito Canadi
+maintainer:     vito.canadi@gmail.com
+license:        NONE
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    CHANGELOG.md
+
+library
+  exposed-modules:
+      Godot.Lang.Class
+      Godot.Lang.Core
+      Godot.Lang.Example.CliMsg
+      Godot.Lang.Example.Common
+      Godot.Lang.Example.SrvMsg
+      Godot.Lang.Example.TH
+      Godot.Lang.Format
+      Godot.Lang.Functions
+      Godot.Lang.TH
+      Godot.Lang.Trans
+      Godot.Lang.Util
+  other-modules:
+      Paths_godot_lang
+  autogen-modules:
+      Paths_godot_lang
+  hs-source-dirs:
+      src
+  default-extensions:
+      LambdaCase
+      OverloadedStrings
+      DefaultSignatures
+      ScopedTypeVariables
+      TypeApplications
+      DeriveGeneric
+  ghc-options: -Wall -Werror=redundant-constraints -Werror=unused-imports
+  build-depends:
+      base
+    , containers
+    , interpolate
+    , lens
+    , linear
+    , template-haskell
+    , text
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Godot.LangSpec
+      Paths_godot_lang
+  autogen-modules:
+      Paths_godot_lang
+  hs-source-dirs:
+      spec
+  default-extensions:
+      LambdaCase
+      OverloadedStrings
+      DefaultSignatures
+      ScopedTypeVariables
+      TypeApplications
+      DeriveGeneric
+  ghc-options: -Wall -Werror=redundant-constraints -Werror=unused-imports
+  build-depends:
+      base
+    , containers
+    , godot-lang
+    , hspec
+    , interpolate
+    , lens
+    , linear
+    , pretty-simple
+    , template-haskell
+    , text
+  default-language: Haskell2010

@@ -57,7 +57,7 @@ newtype Iden = Iden { idenId :: [String] }  deriving(Eq, Show, Semigroup, Monoid
 -- | Call to some godot function
 newtype FuncName = FuncName { cfFunc :: String } deriving (Eq, Show)
 
--- | Inheritacne 'extends' expression
+-- | Inheritance 'extends' expression
 data Extends = ExtendsObject
              | ExtendsReference
   deriving (Eq,Show)
