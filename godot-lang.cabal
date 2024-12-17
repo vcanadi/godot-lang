@@ -76,4 +76,5 @@ test-suite spec
     , text             >= 1.2.5 && < 2.1
     , godot-lang
     , hspec
+    , hspec-golden
   default-language: Haskell2010

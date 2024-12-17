@@ -51,6 +51,12 @@ toGDScriptExtra dir _ =  writeFile (dir <> "/common.gd" ) $ intercalate "\n\n" $
     where
       dcs = addBasicFunctions <$> toDCsExtra (Proxy @as)
 
+-- | Generate GD script of classes for a corresponging type list
+toGDTextExtra :: forall as. (ToDCsExtra as) => Proxy as -> String
+toGDTextExtra _ = intercalate "\n\n" $ fmtDefCls <$> dcs
+    where
+      dcs = addBasicFunctions <$> toDCsExtra (Proxy @as)
+
 -- TODO: Below type families are still unused.
 -- This will be used to recursivelly make DefCls conversion for types that are part of a type with ToDC instance
 -- instead of adding ToDC instance manually to each type
