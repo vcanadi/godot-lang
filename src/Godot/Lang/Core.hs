@@ -31,6 +31,7 @@ class ToTyp t where
   toTyp :: Typ
 
 instance ToTyp Int where toTyp = TypPrim PTInt
+instance ToTyp Bool where toTyp = TypPrim PTBool
 instance ToTyp Double where toTyp = TypPrim PTFloat
 instance ToTyp Float where toTyp = TypPrim PTFloat
 instance ToTyp (V2 n) where toTyp = TypPrim PTV2
